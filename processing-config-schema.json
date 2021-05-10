@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "x-display": "tabs",
+  "required": ["datasetMode", "message"],
+  "allOf": [{
+    "title": "Paramètres",
+    "properties": {
+      "years": {
+        "title": "années",
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "enum": [2017, 2018, 2019, 2020]
+        }
+      },
+      "clearFiles": {
+        "title": "supprimer les fichiers téléchargés",
+        "type": "boolean",
+        "default": true
+      },
+      "skipUpload": {
+        "title": "ne pas charger les jeux de données",
+        "type": "boolean",
+        "default": false
+      }
+    }
+  }]
+}
