@@ -30,9 +30,9 @@ const withStreamableFile = async (filePath, fn) => {
   await fs.move(filePath + '.tmp', filePath, { overwrite: true })
 }
 
-exports.download = async (url, axios, dir, log) => {
+exports.download = async (url, axios, log) => {
   const fileName = path.parse(url.pathname).base
-  const filePath = path.join(dir, fileName)
+  const filePath = `data/${fileName}`
   if (await fs.pathExists(filePath)) {
     log.debug(`le fichier ${fileName} a déjà été téléchargé`)
   } else {
@@ -53,7 +53,7 @@ exports.download = async (url, axios, dir, log) => {
   }
 
   if (fileName.endsWith('.7z')) {
-    const { stderr } = await exec(`7z x -y ${fileName}`, { cwd: dir })
+    const { stderr } = await exec(`7z x -y ${fileName}`, { cwd: path.resolve('data/') })
     if (stderr) throw new Error(`échec à l'extraction de l'archive ${filePath} : ${stderr}`)
   }
 }
