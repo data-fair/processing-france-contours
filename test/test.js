@@ -31,9 +31,10 @@ describe('Hello world processing', () => {
       return Promise.reject(error.response)
     })
     const processingConfig = {
-      years: [2017],
+      years: [2017, 2018, 2019, 2020],
       clearFiles: false,
-      skipUpload: true
+      skipUpload: false,
+      datasetIdPrefix: 'france-contours-test'
     }
     const log = {
       step: (msg) => console.log(chalk.blue.bold.underline(`[${moment().format('LTS')}] ${msg}`)),

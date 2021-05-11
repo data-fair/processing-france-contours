@@ -23,7 +23,8 @@
         "title": "ne pas charger les jeux de données",
         "type": "boolean",
         "default": false
-      }
+      },
+      "datasetIdPrefix": "france-contours"
     }
   }]
 }

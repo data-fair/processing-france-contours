@@ -51,7 +51,8 @@ exports.download = async (url, axios, log) => {
     })
   }
 
-  if (fileName.endsWith('.7z')) {
+  if (fileName.endsWith('.7z') || fileName.endsWith('.7z.001')) {
+    log.debug(`extraction de l'archive ${fileName}`)
     const { stderr } = await exec(`7z x -y ${fileName}`)
     if (stderr) throw new Error(`échec à l'extraction de l'archive ${fileName} : ${stderr}`)
   }
@@ -59,8 +60,9 @@ exports.download = async (url, axios, log) => {
 
 exports.convert = async (filePath, geojsonPath, log) => {
   if (await fs.pathExists(geojsonPath)) {
-    log.debug('le fichier a déjà été converti')
+    log.info(`le fichier a déjà été converti ${geojsonPath}`)
   } else {
+    log.info(`conversion au format geojson ${geojsonPath}`)
     await withStreamableFile(geojsonPath, async (writeStream) => {
       const geoJsonStream = ogr2ogr(filePath)
         .format('GeoJSON')
@@ -93,7 +95,7 @@ exports.normalize = async (geojsonPaths, normalizedPath, mapping, log) => {
   })
 }
 
-exports.upload = async (year, level, filePath, axios, log) => {
+exports.upload = async (prefix, year, level, filePath, axios, log) => {
   log.info('chargement du fichier dans un jeu de données')
   const formData = new FormData()
   formData.append('file', fs.createReadStream(filePath), { filename: path.parse(filePath).base })
@@ -102,7 +104,7 @@ exports.upload = async (year, level, filePath, axios, log) => {
   await log.info(`chargement de (${displayBytes(contentLength)})`)
   await axios({
     method: 'put',
-    url: `api/v1/datasets/france-contours-${year}-${level}`,
+    url: `api/v1/datasets/${prefix}-${year}-${level}`,
     data: formData,
     maxContentLength: Infinity,
     maxBodyLength: Infinity,

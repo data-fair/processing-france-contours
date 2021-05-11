@@ -1,22 +1,17 @@
 const fs = require('fs-extra')
-const { levels, years } = require('./src/data')
+const { levels, getUrl, getPaths, getMappings } = require('./src/data')
 const { download, convert, normalize, upload } = require('./src/steps')
 
 exports.run = async ({ processingConfig, axios, log }) => {
   for (const year of processingConfig.years.map(y => y).sort()) {
+    const mappings = getMappings(year)
     for (const level of levels) {
       await log.step(`Année ${year}, niveau ${level}`)
 
-      if (!years[year]) {
-        await log.warning(`les données IGN ne sont pas référencées pour l'année ${year}`)
-        continue
-      }
-      const url = new URL(years[year].urls[level] || years[year].urls.adminExpress)
-      await download(url, axios, log)
+      await download(getUrl(year, level), axios, log)
 
       const geojsonPaths = []
-      for (const p of years[year].paths[level]) {
-        log.info(`conversion au format geojson ${p}`)
+      for (const p of getPaths(year, level)) {
         await convert(p, p + '.geojson', log)
         geojsonPaths.push(p + '.geojson')
       }
@@ -24,13 +19,13 @@ exports.run = async ({ processingConfig, axios, log }) => {
       await normalize(
         geojsonPaths,
         `${year}-${level}-normalized.geojson`,
-        years[year].mappings[level],
+        mappings[level],
         log
       )
       if (processingConfig.skipUpload) {
         await log.info('le chargement du fichier dans un jeu de données est désactivé')
       } else {
-        await upload(year, level, `${year}-${level}-normalized.geojson`, axios, log)
+        await upload(processingConfig.datasetIdPrefix, year, level, `${year}-${level}-normalized.geojson`, axios, log)
       }
     }
   }
