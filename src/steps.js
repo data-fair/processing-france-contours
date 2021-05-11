@@ -58,15 +58,20 @@ exports.download = async (url, axios, log) => {
   }
 }
 
-exports.convert = async (filePath, geojsonPath, log) => {
-  if (await fs.pathExists(geojsonPath)) {
+exports.convert = async (filePath, geojsonPath, simplify, log, forceConvert) => {
+  if (await fs.pathExists(geojsonPath) && !forceConvert) {
     log.info(`le fichier a déjà été converti ${geojsonPath}`)
   } else {
-    log.info(`conversion au format geojson ${geojsonPath}`)
+    log.info(`conversion au format geojson ${geojsonPath} ${simplify}`)
     await withStreamableFile(geojsonPath, async (writeStream) => {
+      const options = ['-lco', 'RFC7946=YES', '-lco', 'ENCODING=UTF-8', '-t_srs', 'EPSG:4326']
+      if (simplify) {
+        options.push('-simplify')
+        options.push(simplify)
+      }
       const geoJsonStream = ogr2ogr(filePath)
         .format('GeoJSON')
-        .options(['-lco', 'RFC7946=YES', '-lco', 'ENCODING=UTF-8', '-t_srs', 'EPSG:4326'])
+        .options(options)
         .timeout(600000)
         .stream()
       await pump(geoJsonStream, writeStream)
@@ -95,7 +100,7 @@ exports.normalize = async (geojsonPaths, normalizedPath, mapping, log) => {
   })
 }
 
-exports.upload = async (prefix, year, level, filePath, axios, log) => {
+exports.upload = async (id, filePath, axios, log) => {
   log.info('chargement du fichier dans un jeu de données')
   const formData = new FormData()
   formData.append('file', fs.createReadStream(filePath), { filename: path.parse(filePath).base })
@@ -104,7 +109,7 @@ exports.upload = async (prefix, year, level, filePath, axios, log) => {
   await log.info(`chargement de (${displayBytes(contentLength)})`)
   await axios({
     method: 'put',
-    url: `api/v1/datasets/${prefix}-${year}-${level}`,
+    url: `api/v1/datasets/${id}`,
     data: formData,
     maxContentLength: Infinity,
     maxBodyLength: Infinity,

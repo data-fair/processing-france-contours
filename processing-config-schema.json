@@ -5,15 +5,6 @@
   "allOf": [{
     "title": "Paramètres",
     "properties": {
-      "years": {
-        "title": "années",
-        "type": "array",
-        "minItems": 1,
-        "items": {
-          "type": "integer",
-          "enum": [2017, 2018, 2019, 2020]
-        }
-      },
       "clearFiles": {
         "title": "supprimer les fichiers téléchargés",
         "type": "boolean",
@@ -23,6 +14,11 @@
         "title": "ne pas charger les jeux de données",
         "type": "boolean",
         "default": false
+      },
+      "simplifyLevel": {
+        "title": "niveau de simplification",
+        "type": "string",
+        "enum": ["full", "precise", "medium", "simple"]
       },
       "datasetIdPrefix": "france-contours"
     }

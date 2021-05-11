@@ -1,9 +1,11 @@
 const fs = require('fs-extra')
-const { levels, getUrl, getPaths, getMappings } = require('./src/data')
+const { years, levels, simplifyLevels, getUrl, getPaths, getMappings } = require('./src/data')
 const { download, convert, normalize, upload } = require('./src/steps')
 
 exports.run = async ({ processingConfig, axios, log }) => {
-  for (const year of processingConfig.years.map(y => y).sort()) {
+  const simplifyLevel = simplifyLevels[processingConfig.simplifyLevel]
+
+  for (const year of years.map(y => y).sort().reverse()) {
     const mappings = getMappings(year)
     for (const level of levels) {
       await log.step(`Année ${year}, niveau ${level}`)
@@ -12,20 +14,23 @@ exports.run = async ({ processingConfig, axios, log }) => {
 
       const geojsonPaths = []
       for (const p of getPaths(year, level)) {
-        await convert(p, p + '.geojson', log)
-        geojsonPaths.push(p + '.geojson')
+        const geojsonPath = `${p}-${processingConfig.simplifyLevel}.geojson`
+        await convert(p, geojsonPath, simplifyLevel[level], log, processingConfig.forceConvert)
+        geojsonPaths.push(geojsonPath)
       }
 
+      const normGeojsonPath = `${year}-${level}-${processingConfig.simplifyLevel}-normalized.geojson`
       await normalize(
         geojsonPaths,
-        `${year}-${level}-normalized.geojson`,
+        normGeojsonPath,
         mappings[level],
         log
       )
       if (processingConfig.skipUpload) {
         await log.info('le chargement du fichier dans un jeu de données est désactivé')
       } else {
-        await upload(processingConfig.datasetIdPrefix, year, level, `${year}-${level}-normalized.geojson`, axios, log)
+        const datasetId = `${processingConfig.datasetIdPrefix}-${year}-${level}-${processingConfig.simplifyLevel}`
+        await upload(datasetId, normGeojsonPath, axios, log)
       }
     }
   }

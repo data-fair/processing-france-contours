@@ -1,4 +1,38 @@
+// revers order is important, data from recent years are used to complete older data
+exports.years = [2020, 2019, 2018, 2017]
+// exports.years = [2020]
+
+// order is important, data from higher levels are used to complete lower levels
 exports.levels = ['region', 'departement', 'epci', 'commune', 'iris']
+// exports.levels = ['region', 'departement']
+
+// exports.levels = ['epci']
+
+// geometry simplification
+exports.simplifyLevels = {
+  full: {},
+  precise: {
+    region: '6',
+    departement: '4',
+    epci: '2',
+    commune: '2',
+    iris: '2'
+  },
+  medium: {
+    region: '30',
+    departement: '20',
+    epci: '10',
+    commune: '10',
+    iris: '10'
+  },
+  simple: {
+    region: '150',
+    departement: '100',
+    epci: '50',
+    commune: '50',
+    iris: '50'
+  }
+}
 
 // données admin express COG pour des tracés géographique en accord avec la nomenclature insee du découpage territorial
 // cf https://geoservices.ign.fr/documentation/diffusion/telechargement-donnees-libres.html#admin-express
@@ -80,68 +114,89 @@ exports.getPaths = (year, level) => {
 // object used to store some data useful to read info from one level to another
 const memory = {}
 
+// fix keys order in object
+const sortKeys = (obj) => {
+  const keys = Object.keys(obj).sort((a, b) => {
+    const partsA = a.split('_')
+    const partsB = b.split('_')
+    if (partsA.length !== partsB.length) return partsA.length - partsB.length
+    const comp1 = partsA.pop().localeCompare(partsB.pop())
+    if (comp1 !== 0) return comp1
+    return partsA.pop().localeCompare(partsB.pop()) * -1
+  })
+  return keys.reduce((clone, key) => { clone[key] = obj[key]; return clone }, {})
+}
+
 exports.getMappings = (year) => {
   return {
     region: (props) => {
-      const id = `reg-${year}-${props.INSEE_REG}`
-      memory[id] = props.NOM_REG
+      delete props.NOM_REG_M
+      delete props.ID
+      memory[`reg-${props.INSEE_REG}`] = memory[`reg-${props.INSEE_REG}`] ||
+        { NOM_REG: props.NOM_REG, CHF_REG: props.CHF_REG }
       return {
-        id,
-        properties: {
+        id: `reg-${year}-${props.INSEE_REG}`,
+        properties: sortKeys({
           niveau: 'région',
           annee: year,
           ...props,
-          ID: undefined
-        }
+          ...memory[`reg-${props.INSEE_REG}`] // use the data from most recent year (more complete)
+        })
       }
     },
     departement: (props) => {
+      delete props.NOM_DEP_M
+      delete props.ID
+      memory[`dep-${props.INSEE_DEP}`] = memory[`dep-${props.INSEE_DEP}`] ||
+        { NOM_DEP: props.NOM_DEP, CHF_DEP: props.CHF_DEP }
       return {
         id: `dep-${year}-${props.INSEE_DEP}`,
-        properties: {
+        properties: sortKeys({
           niveau: 'département',
           annee: year,
           ...props,
-          NOM_REG: memory[`reg-2017-${props.INSEE_REG}`],
-          ID: undefined
-        }
+          ...memory[`dep-${props.INSEE_DEP}`], // use the data from most recent year (more complete)
+          NOM_REG: memory[`reg-${props.INSEE_REG}`].NOM_REG
+        })
       }
     },
     epci: (props) => {
+      delete props.ID
       const id = `epci-${year}-${props.CODE_EPCI}`
       memory[id] = { NOM_EPCI: props.NOM_EPCI, TYPE_EPCI: props.TYPE_EPCI }
       return {
         id,
-        properties: {
+        properties: sortKeys({
           niveau: 'EPCI',
           annee: 2017,
-          ...props,
-          ID: undefined
-        }
+          ...props
+        })
       }
     },
     commune: (props) => {
+      delete props.ID
+      delete props.NOM_COM_M
       const epci = memory[`epci-${year}-${props.CODE_EPCI}`]
       return {
         id: `com-${year}-${props.INSEE_COM}`,
-        properties: {
+        properties: sortKeys({
           niveau: 'commune',
           annee: 2017,
           ...props,
-          ...epci,
-          ID: undefined,
-          NOM_COM_M: undefined
-        }
+          NOM_REF: memory[`reg-${props.INSEE_REG}`].NOM_REG,
+          NOM_DEP: memory[`dep-${props.INSEE_DEP}`].NOM_DEP,
+          ...epci
+        })
       }
     },
     iris: (props) => {
       return {
         id: `iris-${year}-${props.CODE_IRIS}`,
-        properties: {
+        properties: sortKeys({
           niveau: 'IRIS',
           annee: year,
           ...props
-        }
+        })
       }
     }
   }

@@ -7,7 +7,7 @@ const moment = require('moment')
 const assert = require('assert').strict
 const franceContours = require('../')
 
-describe('Hello world processing', () => {
+describe('France contours processing', () => {
   it('should expose a processing config schema for users', async () => {
     const schema = require('../processing-config-schema.json')
     assert.equal(schema.type, 'object')
@@ -31,10 +31,11 @@ describe('Hello world processing', () => {
       return Promise.reject(error.response)
     })
     const processingConfig = {
-      years: [2017, 2018, 2019, 2020],
       clearFiles: false,
       skipUpload: false,
-      datasetIdPrefix: 'france-contours-test'
+      forceConvert: true,
+      datasetIdPrefix: 'france-contours-test',
+      simplifyLevel: 'simple'
     }
     const log = {
       step: (msg) => console.log(chalk.blue.bold.underline(`[${moment().format('LTS')}] ${msg}`)),
