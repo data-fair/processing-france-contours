@@ -32,12 +32,11 @@ const withStreamableFile = async (filePath, fn) => {
 
 exports.download = async (url, axios, log) => {
   const fileName = path.parse(url.pathname).base
-  const filePath = `data/${fileName}`
-  if (await fs.pathExists(filePath)) {
+  if (await fs.pathExists(fileName)) {
     log.debug(`le fichier ${fileName} a déjà été téléchargé`)
   } else {
     log.info(`téléchargement du fichier ${fileName}`)
-    await withStreamableFile(filePath, async (writeStream) => {
+    await withStreamableFile(fileName, async (writeStream) => {
       if (url.protocol === 'ftp:') {
         const FTPClient = require('promise-ftp')
         const ftp = new FTPClient()
@@ -53,8 +52,8 @@ exports.download = async (url, axios, log) => {
   }
 
   if (fileName.endsWith('.7z')) {
-    const { stderr } = await exec(`7z x -y ${fileName}`, { cwd: path.resolve('data/') })
-    if (stderr) throw new Error(`échec à l'extraction de l'archive ${filePath} : ${stderr}`)
+    const { stderr } = await exec(`7z x -y ${fileName}`)
+    if (stderr) throw new Error(`échec à l'extraction de l'archive ${fileName} : ${stderr}`)
   }
 }
 

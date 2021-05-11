@@ -48,6 +48,10 @@ describe('Hello world processing', () => {
       console.log('received config patch', patch)
       Object.assign(processingConfig, patch)
     }
-    await franceContours.run({ processingConfig, axios: axiosInstance, log, patchConfig, dir: path.resolve('./data/') })
+    const cwd = process.cwd()
+    process.chdir('data/')
+    console.log(process.cwd())
+    await franceContours.run({ processingConfig, axios: axiosInstance, log, patchConfig, dir: path.resolve('./') })
+    process.chdir(cwd)
   })
 })
