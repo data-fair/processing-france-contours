@@ -1,13 +1,14 @@
 {
   "type": "object",
   "x-display": "tabs",
-  "required": ["datasetMode", "message"],
+  "required": ["years"],
   "allOf": [{
     "title": "Paramètres",
     "properties": {
       "years": {
         "title": "années",
         "type": "array",
+        "minItems": 1,
         "items": {
           "type": "integer",
           "enum": [2017, 2018, 2019, 2020]
