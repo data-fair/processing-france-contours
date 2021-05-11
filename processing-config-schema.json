@@ -1,7 +1,6 @@
 {
   "type": "object",
   "x-display": "tabs",
-  "required": ["years"],
   "allOf": [{
     "title": "Paramètres",
     "properties": {
@@ -18,6 +17,7 @@
       "simplifyLevel": {
         "title": "niveau de simplification",
         "type": "string",
+        "default": "medium",
         "enum": ["full", "precise", "medium", "simple"]
       },
       "datasetIdPrefix": "france-contours"
