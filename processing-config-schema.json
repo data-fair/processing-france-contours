@@ -20,7 +20,11 @@
         "default": "medium",
         "enum": ["full", "precise", "medium", "simple"]
       },
-      "datasetIdPrefix": "france-contours"
+      "datasetIdPrefix": {
+        "title": "Préfixe des identifiants de jeux de données",
+        "type": "string",
+        "default": "france-contours"
+      }
     }
   }]
 }
