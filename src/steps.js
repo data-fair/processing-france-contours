@@ -104,6 +104,7 @@ exports.upload = async (id, filePath, schema, axios, log) => {
   log.info('chargement du fichier dans un jeu de données')
   const formData = new FormData()
   formData.append('schema', JSON.stringify(schema))
+  formData.append('title', id.replace(/-/g, ' '))
   formData.append('file', fs.createReadStream(filePath), { filename: path.parse(filePath).base })
   formData.getLength = util.promisify(formData.getLength)
   const contentLength = await formData.getLength()
