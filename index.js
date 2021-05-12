@@ -1,5 +1,5 @@
 const fs = require('fs-extra')
-const { years, levels, simplifyLevels, getUrl, getPaths, getMappings } = require('./src/data')
+const { years, levels, simplifyLevels, getUrl, getPaths, getMappings, schemas } = require('./src/data')
 const { download, convert, normalize, upload } = require('./src/steps')
 
 exports.run = async ({ processingConfig, axios, log }) => {
@@ -26,11 +26,12 @@ exports.run = async ({ processingConfig, axios, log }) => {
         mappings[level],
         log
       )
+
       if (processingConfig.skipUpload) {
         await log.info('le chargement du fichier dans un jeu de données est désactivé')
       } else {
         const datasetId = `${processingConfig.datasetIdPrefix}-${year}-${level}-${processingConfig.simplifyLevel}`
-        await upload(datasetId, normGeojsonPath, axios, log)
+        await upload(datasetId, normGeojsonPath, schemas[level], axios, log)
       }
     }
   }

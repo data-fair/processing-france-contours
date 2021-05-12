@@ -4,9 +4,7 @@ exports.years = [2020, 2019, 2018, 2017]
 
 // order is important, data from higher levels are used to complete lower levels
 exports.levels = ['region', 'departement', 'epci', 'commune', 'iris']
-// exports.levels = ['region', 'departement']
-
-// exports.levels = ['epci']
+// exports.levels = ['region']
 
 // geometry simplification
 exports.simplifyLevels = {
@@ -183,7 +181,7 @@ exports.getMappings = (year) => {
           niveau: 'commune',
           annee: 2017,
           ...props,
-          NOM_REF: memory[`reg-${props.INSEE_REG}`].NOM_REG,
+          NOM_REG: memory[`reg-${props.INSEE_REG}`].NOM_REG,
           NOM_DEP: memory[`dep-${props.INSEE_DEP}`].NOM_DEP,
           ...epci
         })
@@ -200,4 +198,35 @@ exports.getMappings = (year) => {
       }
     }
   }
+}
+
+/*
+ * schemas used for upload step
+ */
+
+const inseeReg = { key: 'INSEE_REG', 'x-originalName': 'INSEE_REG', title: 'Code région', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeRegion' }
+const nomReg = { key: 'NOM_REG', 'x-originalName': 'NOM_REG', title: 'Nom région', type: 'string' }
+const chfReg = { key: 'CHF_REG', 'x-originalName': 'CHF_REG', title: 'Code chef lieu région', type: 'string' }
+const inseeDep = { key: 'INSEE_DEP', 'x-originalName': 'INSEE_DEP', title: 'Code département', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeDepartement' }
+const nomDep = { key: 'NOM_DEP', 'x-originalName': 'NOM_DEP', title: 'Nom département', type: 'string' }
+const chfDep = { key: 'CHF_DEP', 'x-originalName': 'CHF_DEP', title: 'Code chef lieu département', type: 'string' }
+const typeEpci = { key: 'TYPE_EPCI', 'x-originalName': 'TYPE_EPCI', title: 'Type EPCI', type: 'string' }
+const nomEpci = { key: 'NOM_EPCI', 'x-originalName': 'NOM_EPCI', title: 'Nom EPCI', type: 'string' }
+const codeEpci = { key: 'CODE_EPCI', 'x-originalName': 'CODE_EPCI', title: 'Code EPCI', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#EtablissementPublicDeCooperationIntercommunale' }
+const inseeCom = { key: 'INSEE_COM', 'x-originalName': 'INSEE_COM', title: 'Code commune', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeCommune' }
+const nomCom = { key: 'NOM_COM', 'x-originalName': 'NOM_COM', title: 'Nom commune', type: 'string', 'x-refersTo': 'http://schema.org/City' }
+const pop = { key: 'POPULATION', 'x-originalName': 'POPULATION', title: 'Population', type: 'string' }
+const statut = { key: 'STATUT', 'x-originalName': 'STATUT', title: 'Statut', type: 'string' }
+const inseeArr = { key: 'INSEE_ARR', 'x-originalName': 'INSEE_ARR', title: 'Code arrondissement', type: 'string', ignoreDetection: true }
+const inseeCan = { key: 'INSEE_CAN', 'x-originalName': 'INSEE_CAN', title: 'Code canton', type: 'string', ignoreDetection: true }
+const typeIris = { key: 'TYP_IRIS', 'x-originalName': 'TYP_IRIS', title: 'Type IRIS', type: 'string' }
+const nomIris = { key: 'NOM_IRIS', 'x-originalName': 'NOM_IRIS', title: 'Nom IRIS', type: 'string' }
+const codeIris = { key: 'CODE_IRIS', 'x-originalName': 'CODE_IRIS', title: 'Code IRIS', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeIRIS' }
+
+exports.schemas = {
+  region: [nomReg, inseeReg, chfReg],
+  departement: [nomDep, inseeDep, chfDep, nomReg, inseeReg],
+  epci: [nomEpci, codeEpci, typeEpci],
+  commune: [nomCom, inseeCom, statut, pop, inseeArr, inseeCan, nomReg, inseeReg, nomDep, inseeDep, nomEpci, codeEpci, typeEpci],
+  iris: [nomIris, codeIris, typeIris, nomCom, inseeCom]
 }
