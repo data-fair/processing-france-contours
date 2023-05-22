@@ -18,35 +18,39 @@ function displayBytes (aSize) {
   }
 }
 
-const withStreamableFile = async (filePath, fn) => {
+const withStreamableFile = async (filePath, tmpDir, fn) => {
   // creating empty file before streaming seems to fix some weird bugs with NFS
-  await fs.ensureFile(filePath + '.tmp')
-  await fn(fs.createWriteStream(filePath + '.tmp'))
+  await fs.ensureFile(tmpDir + '/' + filePath + '.tmp')
+  await fn(fs.createWriteStream(tmpDir + '/' + filePath + '.tmp'))
   // Try to prevent weird bug with NFS by forcing syncing file before reading it
-  const fd = await fs.open(filePath + '.tmp', 'r')
+  const fd = await fs.open(tmpDir + '/' + filePath + '.tmp', 'r')
   await fs.fsync(fd)
   await fs.close(fd)
   // write in tmp file then move it for a safer operation that doesn't create partial files
-  await fs.move(filePath + '.tmp', filePath, { overwrite: true })
+  await fs.move(tmpDir + '/' + filePath + '.tmp', tmpDir + '/' + filePath, { overwrite: true })
 }
 
-exports.download = async (url, axios, log) => {
+exports.download = async (url, axios, tmpDir, log) => {
   const fileName = path.parse(url.pathname).base
   if (await fs.pathExists(fileName)) {
     log.debug(`le fichier ${fileName} a déjà été téléchargé`)
   } else {
     log.info(`téléchargement du fichier ${fileName}`)
-    await withStreamableFile(fileName, async (writeStream) => {
+    await withStreamableFile(fileName, tmpDir, async (writeStream) => {
       if (url.protocol === 'ftp:') {
         const FTPClient = require('promise-ftp')
         const ftp = new FTPClient()
         const serverMessage = await ftp.connect({ host: url.host, user: url.username, password: url.password })
         await log.debug('connecté au ftp : ' + serverMessage)
+        await log.info('Début du téléchargement')
         await pump(await ftp.get(url.pathname), writeStream)
+        await log.info('Fin du téléchargement')
         await ftp.end()
       } else {
+        await log.info('Début du téléchargement')
         const res = await axios({ url: url.href, method: 'GET', responseType: 'stream' })
         await pump(res.data, writeStream)
+        await log.info('Fin du téléchargement')
       }
     })
   }

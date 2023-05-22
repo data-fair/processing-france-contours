@@ -2,7 +2,7 @@ const fs = require('fs-extra')
 const { years, levels, simplifyLevels, getUrl, getPaths, getMappings, schemas } = require('./src/data')
 const { download, convert, normalize, upload } = require('./src/steps')
 
-exports.run = async ({ processingConfig, axios, log }) => {
+exports.run = async ({ pluginConfig, processingConfig, tmpDir, axios, log, patchConfig }) => {
   const simplifyLevel = simplifyLevels[processingConfig.simplifyLevel]
 
   for (const year of years.map(y => y).sort().reverse()) {
@@ -10,7 +10,7 @@ exports.run = async ({ processingConfig, axios, log }) => {
     for (const level of levels) {
       await log.step(`Année ${year}, niveau ${level}`)
 
-      await download(getUrl(year, level), axios, log)
+      await download(getUrl(year, level), axios, tmpDir, log)
 
       const geojsonPaths = []
       for (const p of getPaths(year, level)) {

@@ -32,10 +32,11 @@
     "pump": "^3.0.0"
   },
   "devDependencies": {
+    "@data-fair/processings-test-utils": "^0.5.2",
     "chalk": "^4.1.0",
     "config": "^3.3.6",
     "eslint": "^7.18.0",
-    "mocha": "^8.2.1",
+    "mocha": "^10.2.0",
     "moment": "^2.29.1",
     "standard": "^16.0.3"
   }
