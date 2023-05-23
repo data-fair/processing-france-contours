@@ -15,23 +15,29 @@ exports.run = async ({ pluginConfig, processingConfig, tmpDir, axios, log, patch
       const geojsonPaths = []
       for (const p of getPaths(year, level)) {
         const geojsonPath = `${p}-${processingConfig.simplifyLevel}.geojson`
-        await convert(p, geojsonPath, simplifyLevel[level], log, processingConfig.forceConvert)
-        geojsonPaths.push(geojsonPath)
+        try {
+          await convert(p, geojsonPath, simplifyLevel[level], tmpDir, log, processingConfig.forceConvert)
+          geojsonPaths.push(geojsonPath)
+        } catch (e) {
+          await log.error(`échec à la conversion du fichier ${p}`)
+        }
       }
+      if (geojsonPaths.length !== 0) {
+        const normGeojsonPath = `${year}-${level}-${processingConfig.simplifyLevel}-normalized.geojson`
+        await normalize(
+          geojsonPaths,
+          normGeojsonPath,
+          mappings[level],
+          tmpDir,
+          log
+        )
 
-      const normGeojsonPath = `${year}-${level}-${processingConfig.simplifyLevel}-normalized.geojson`
-      await normalize(
-        geojsonPaths,
-        normGeojsonPath,
-        mappings[level],
-        log
-      )
-
-      if (processingConfig.skipUpload) {
-        await log.info('le chargement du fichier dans un jeu de données est désactivé')
-      } else {
-        const datasetId = `${processingConfig.datasetIdPrefix}-${year}-${level}-${processingConfig.simplifyLevel}`
-        await upload(datasetId, normGeojsonPath, schemas[level], axios, log)
+        if (processingConfig.skipUpload) {
+          await log.info('le chargement du fichier dans un jeu de données est désactivé')
+        } else {
+          const datasetId = `${processingConfig.datasetIdPrefix}-${year}-${level}-${processingConfig.simplifyLevel}`
+          await upload(datasetId, tmpDir + normGeojsonPath, schemas[level], axios, log)
+        }
       }
     }
   }

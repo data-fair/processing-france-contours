@@ -3,7 +3,7 @@ exports.years = [2023, 2022, 2021, 2020, 2019, 2018, 2017]
 // exports.years = [2023]
 
 // order is important, data from higher levels are used to complete lower levels
-exports.levels = ['region', 'departement', 'epci', 'commune', 'arrondissement_municipal', 'iris']
+exports.levels = ['region', 'departement', 'epci', 'commune', 'arrondissement-municipal', 'iris']
 // exports.levels = ['region']
 
 // geometry simplification
@@ -14,7 +14,7 @@ exports.simplifyLevels = {
     departement: '4',
     epci: '2',
     commune: '2',
-    arrondissement_municipal: '2',
+    'arrondissement-municipal': '2',
     iris: '2'
   },
   medium: {
@@ -22,7 +22,7 @@ exports.simplifyLevels = {
     departement: '20',
     epci: '10',
     commune: '10',
-    arrondissement_municipal: '10',
+    'arrondissement-municipal': '10',
     iris: '10'
   },
   simple: {
@@ -30,14 +30,14 @@ exports.simplifyLevels = {
     departement: '100',
     epci: '50',
     commune: '50',
-    arrondissement_municipal: '50',
+    'arrondissement-municipal': '50',
     iris: '50'
   }
 }
 
 // données admin express COG pour des tracés géographique en accord avec la nomenclature insee du découpage territorial
 // cf https://geoservices.ign.fr/documentation/diffusion/telechargement-donnees-libres.html#admin-express
-const adminExpressLevels = ['region', 'departement', 'epci', 'commune', 'arrondissement_municipal']
+const adminExpressLevels = ['region', 'departement', 'epci', 'commune', 'arrondissement-municipal']
 
 /*
   info necessary for the download step
@@ -45,19 +45,19 @@ const adminExpressLevels = ['region', 'departement', 'epci', 'commune', 'arrondi
 const urls = {
   2017: {
     adminExpress: 'https://wxs.ign.fr/x02uy2aiwjo9bm8ce5plwqmr/telechargement/prepackage/ADMINEXPRESS-COG-PACK_2017-07-07%24ADMIN-EXPRESS-COG_1-0__SHP__FRA_2017-06-19/file/ADMIN-EXPRESS-COG_1-0__SHP__FRA_2017-06-19.7z',
-    iris: 'ftp://Contours_IRIS_ext:ao6Phu5ohJ4jaeji@ftp3.ign.fr/CONTOURS-IRIS_2-1__SHP__FRA_2017-01-01.7z'
+    iris: 'https://wxs.ign.fr/1yhlj2ehpqf3q6dt6a2y7b64/telechargement/inspire/CONTOURS-IRIS-2017-01-01$CONTOURS-IRIS_2-1__SHP__FRA_2018-06-08/file/CONTOURS-IRIS_2-1__SHP__FRA_2018-06-08.7z'
   },
   2018: {
-    adminExpress: 'ftp://Admin_Express_ext:Dahnoh0eigheeFok@ftp3.ign.fr/ADMIN-EXPRESS-COG_1-1__SHP__FRA_2018-04-03.7z',
-    iris: 'ftp://Contours_IRIS_ext:ao6Phu5ohJ4jaeji@ftp3.ign.fr/CONTOURS-IRIS_2-1__SHP__FRA_2018-01-01.7z.001'
+    adminExpress: 'https://wxs.ign.fr/x02uy2aiwjo9bm8ce5plwqmr/telechargement/prepackage/ADMINEXPRESS-COG-PACK_2018-04-01$ADMIN-EXPRESS-COG_1-1__SHP__FRA_2018-04-03/file/ADMIN-EXPRESS-COG_1-1__SHP__FRA_2018-04-03.7z',
+    iris: 'https://wxs.ign.fr/1yhlj2ehpqf3q6dt6a2y7b64/telechargement/inspire/CONTOURS-IRIS-2018-01-02$CONTOURS-IRIS_2-1__SHP__FRA_2018-01-01/file/CONTOURS-IRIS_2-1__SHP__FRA_2018-01-01.7z'
   },
   2019: {
-    adminExpress: 'ftp://Admin_Express_ext:Dahnoh0eigheeFok@ftp3.ign.fr/ADMIN-EXPRESS-COG_2-0__SHP__FRA_L93_2019-09-24.7z.001',
-    iris: 'ftp://Contours_IRIS_ext:ao6Phu5ohJ4jaeji@ftp3.ign.fr/CONTOURS-IRIS_2-1__SHP__FRA_2019-01-01.7z.001'
+    adminExpress: 'https://wxs.ign.fr/x02uy2aiwjo9bm8ce5plwqmr/telechargement/prepackage/ADMINEXPRESS-COG_SHP_WGS84G_PACK_09-2019$ADMIN-EXPRESS-COG_2-0__SHP__FRA_2019-09-24/file/ADMIN-EXPRESS-COG_2-0__SHP__FRA_2019-09-24.7z',
+    iris: 'https://wxs.ign.fr/1yhlj2ehpqf3q6dt6a2y7b64/telechargement/inspire/CONTOURS-IRIS-2019-01-01$CONTOURS-IRIS_2-1__SHP__FRA_2019-01-01/file/CONTOURS-IRIS_2-1__SHP__FRA_2019-01-01.7z'
   },
   2020: {
-    adminExpress: 'ftp://Admin_Express_ext:Dahnoh0eigheeFok@ftp3.ign.fr/ADMIN-EXPRESS-COG_2-1__SHP__FRA_L93_2020-11-20.7z',
-    iris: 'ftp://Contours_IRIS_ext:ao6Phu5ohJ4jaeji@ftp3.ign.fr/CONTOURS-IRIS_2-1__SHP__FRA_2020-01-01.7z'
+    adminExpress: 'https://wxs.ign.fr/x02uy2aiwjo9bm8ce5plwqmr/telechargement/prepackage/ADMINEXPRESS-COG_SHP_WGS84G_PACK_11-2020$ADMIN-EXPRESS-COG_2-1__SHP__FRA_2020-11-20/file/ADMIN-EXPRESS-COG_2-1__SHP__FRA_2020-11-20.7z',
+    iris: 'https://wxs.ign.fr/1yhlj2ehpqf3q6dt6a2y7b64/telechargement/inspire/CONTOURS-IRIS-2020-01-01$CONTOURS-IRIS_2-1__SHP__FRA_2020-01-01/file/CONTOURS-IRIS_2-1__SHP__FRA_2020-01-01.7z'
   },
   2021: {
     adminExpress: 'https://wxs.ign.fr/x02uy2aiwjo9bm8ce5plwqmr/telechargement/prepackage/ADMINEXPRESS-COG_SHP_WGS84G_PACK_2021-05-19$ADMIN-EXPRESS-COG_3-0__SHP_WGS84G_FRA_2021-05-19/file/ADMIN-EXPRESS-COG_3-0__SHP_WGS84G_FRA_2021-05-19.7z',
@@ -91,8 +91,8 @@ const adminExpressPrefixes = {
 }
 const adminExpressDirs = {
   2017: ['ADE-COG_1-0_SHP_LAMB93_FR', 'ADE-COG_1-0_SHP_UTM20W84GUAD_D971', 'ADE-COG_1-0_SHP_UTM20W84MART_D972', 'ADE-COG_1-0_SHP_UTM22RGFG95_D973', 'ADE-COG_1-0_SHP_RGR92UTM40S_D974', 'ADE-COG_1-0_SHP_RGM04UTM38S_D976'],
-  2019: ['ADE-COG_2-0_SHP_LAMB93_FR', 'ADE-COG_2-0_SHP_RGAF09UTM20_D971', 'ADE-COG_2-0_SHP_RGAF09UTM20_D972', 'ADE-COG_2-0_SHP_UTM22RGFG95_D973', 'ADE-COG_2-0_SHP_RGR92UTM40S_D974', 'ADE-COG_2-0_SHP_RGM04UTM38S_D976'],
-  2021: ['ADECOG_3-0_SHO_WGS84G_FRA']
+  2019: ['ADE-COG_2-0_SHP_WGS84G_FRA'],
+  2021: ['ADECOG_3-0_SHP_WGS84G_FRA']
 }
 adminExpressDirs[2018] = adminExpressDirs[2017].map(dir => dir.replace('COG_1-0', 'COG_1-1'))
 adminExpressDirs[2020] = adminExpressDirs[2019].map(dir => dir.replace('COG_2-0', 'COG_2-1'))
@@ -103,7 +103,7 @@ const adminExpressShp = {
   departement: 'DEPARTEMENT',
   epci: 'EPCI',
   commune: 'COMMUNE',
-  arrondissement_municipal: 'ARRONDISSEMENT_MUNICIPAL',
+  'arrondissement-municipal': 'ARRONDISSEMENT_MUNICIPAL',
   iris: 'CONTOURS-IRIS'
 }
 const irisPrefixes = {
@@ -112,7 +112,8 @@ const irisPrefixes = {
   2019: 'CONTOURS-IRIS_2-1__SHP__FRA_2020-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2020-01-00139',
   2020: 'CONTOURS-IRIS_2-1__SHP__FRA_2020-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2020-12-00282',
   2021: 'CONTOURS-IRIS_2-1__SHP__FRA_2021-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2021-06-00217',
-  2022: 'CONTOURS-IRIS_2-1__SHP__FRA_2022-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2022-06-00180'
+  2022: 'CONTOURS-IRIS_2-1__SHP__FRA_2022-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2022-06-00180',
+  2023: 'CONTOURS-IRIS_2-1__SHP__FRA_2022-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2022-06-00180'
 }
 const irisDirs = {
   2017: ['CONTOURS-IRIS_2-1_SHP_LAMB93_FXX-2017', 'CONTOURS-IRIS_2-1_SHP_RGM04UTM38S_MYT-2017', 'CONTOURS-IRIS_2-1_SHP_RGR92UTM40S_REU-2017', 'CONTOURS-IRIS_2-1_SHP_RGSPM06U21_SPM-2017', 'CONTOURS-IRIS_2-1_SHP_UTM20W84GUAD_GLP-2017', 'CONTOURS-IRIS_2-1_SHP_UTM20W84MART_MTQ-2017', 'CONTOURS-IRIS_2-1_SHP_UTM22RGFG95_GUF-2017'],
@@ -122,6 +123,7 @@ const irisDirs = {
 irisDirs[2018] = irisDirs[2017].map(dir => dir.replace('2017', '2018'))
 irisDirs[2021] = irisDirs[2019].map(dir => dir.replace('2019', '2021'))
 irisDirs[2022] = irisDirs[2019].map(dir => dir.replace('2019', '2022'))
+irisDirs[2023] = irisDirs[2019].map(dir => dir.replace('2019', '2022'))
 
 exports.getPaths = (year, level) => {
   if (level === 'iris') {
@@ -154,7 +156,6 @@ const sortKeys = (obj) => {
 exports.getMappings = (year) => {
   return {
     region: (props) => {
-      delete props.NOM_REG_M
       delete props.ID
       memory[`reg-${props.INSEE_REG}`] = memory[`reg-${props.INSEE_REG}`] ||
         { NOM_REG: props.NOM_REG, CHF_REG: props.CHF_REG }
@@ -169,7 +170,6 @@ exports.getMappings = (year) => {
       }
     },
     departement: (props) => {
-      delete props.NOM_DEP_M
       delete props.ID
       memory[`dep-${props.INSEE_DEP}`] = memory[`dep-${props.INSEE_DEP}`] ||
         { NOM_DEP: props.NOM_DEP, CHF_DEP: props.CHF_DEP }
@@ -199,7 +199,6 @@ exports.getMappings = (year) => {
     },
     commune: (props) => {
       delete props.ID
-      delete props.NOM_COM_M
       const epci = memory[`epci-${year}-${props.CODE_EPCI}`]
       return {
         id: `com-${year}-${props.INSEE_COM}`,
@@ -213,18 +212,14 @@ exports.getMappings = (year) => {
         })
       }
     },
-    arrondissement_municipal: (props) => {
+    'arrondissement-municipal': (props) => {
       delete props.ID
-      const epci = memory[`epci-${year}-${props.CODE_EPCI}`]
       return {
-        id: `am-${year}-${props.CODE_AM}`,
+        id: `arm-${year}-${props.INSEE_ARM}`,
         properties: sortKeys({
           niveau: 'arrondissement municipal',
           annee: year,
-          ...props,
-          NOM_REG: memory[`reg-${props.INSEE_REG}`].NOM_REG,
-          NOM_DEP: memory[`dep-${props.INSEE_DEP}`].NOM_DEP,
-          ...epci
+          ...props
         })
       }
     },
@@ -256,10 +251,11 @@ const nomEpci = { key: 'NOM_EPCI', 'x-originalName': 'NOM_EPCI', title: 'Nom EPC
 const codeEpci = { key: 'CODE_EPCI', 'x-originalName': 'CODE_EPCI', title: 'Code EPCI', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#EtablissementPublicDeCooperationIntercommunale' }
 const inseeCom = { key: 'INSEE_COM', 'x-originalName': 'INSEE_COM', title: 'Code commune', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeCommune' }
 const nomCom = { key: 'NOM_COM', 'x-originalName': 'NOM_COM', title: 'Nom commune', type: 'string', 'x-refersTo': 'http://schema.org/City' }
+const nomArm = { key: 'NOM_ARM', 'x-originalName': 'NOM_ARM', title: 'Nom arrondissement municipal', type: 'string' }
+const inseeArm = { key: 'INSEE_ARM', 'x-originalName': 'INSEE_ARM', title: 'Code arrondissement municipal', type: 'string', ignoreDetection: true }
 const pop = { key: 'POPULATION', 'x-originalName': 'POPULATION', title: 'Population', type: 'string' }
 const statut = { key: 'STATUT', 'x-originalName': 'STATUT', title: 'Statut', type: 'string' }
-const nomAm = { key: 'NOM_AM', 'x-originalName': 'NOM_AM', title: 'Nom arrondissement municipal', type: 'string' }
-const codeAm = { key: 'CODE_AM', 'x-originalName': 'CODE_AM', title: 'Code arrondissement municipal', type: 'string', ignoreDetection: true }
+
 const inseeArr = { key: 'INSEE_ARR', 'x-originalName': 'INSEE_ARR', title: 'Code arrondissement', type: 'string', ignoreDetection: true }
 const inseeCan = { key: 'INSEE_CAN', 'x-originalName': 'INSEE_CAN', title: 'Code canton', type: 'string', ignoreDetection: true }
 const typeIris = { key: 'TYP_IRIS', 'x-originalName': 'TYP_IRIS', title: 'Type IRIS', type: 'string' }
@@ -271,6 +267,6 @@ exports.schemas = {
   departement: [nomDep, inseeDep, chfDep, nomReg, inseeReg],
   epci: [nomEpci, codeEpci, typeEpci],
   commune: [nomCom, inseeCom, statut, pop, inseeArr, inseeCan, nomReg, inseeReg, nomDep, inseeDep, nomEpci, codeEpci, typeEpci],
-  arrondissement_municipal: [nomAm, codeAm, nomReg, inseeReg, nomDep, inseeDep, nomEpci, codeEpci, typeEpci],
+  'arrondissement-municipal': [nomArm, inseeArm, pop, inseeCom],
   iris: [nomIris, codeIris, typeIris, nomCom, inseeCom]
 }
