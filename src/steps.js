@@ -79,7 +79,7 @@ exports.convert = async (filePath, geojsonPath, simplify, tmpDir, log, forceConv
         options.push('-simplify')
         options.push(simplify)
       }
-      const geoJsonStream = ogr2ogr(tmpDir + filePath)
+      const geoJsonStream = ogr2ogr(path.join(tmpDir, filePath))
         .format('GeoJSON')
         .options(options)
         .timeout(6000000)
