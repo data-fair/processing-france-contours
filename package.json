@@ -1,6 +1,6 @@
 {
   "name": "@data-fair/processing-france-contours",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Inject France administrative contours into data-fair datasets.",
   "main": "index.js",
   "scripts": {
