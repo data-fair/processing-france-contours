@@ -20,19 +20,19 @@ function displayBytes (aSize) {
 
 const withStreamableFile = async (filePath, tmpDir, fn) => {
   // creating empty file before streaming seems to fix some weird bugs with NFS
-  await fs.ensureFile(tmpDir + filePath)
-  await fn(fs.createWriteStream(tmpDir + filePath))
+  await fs.ensureFile(path.join(tmpDir, filePath + '.tmp'))
+  await fn(fs.createWriteStream(path.join(tmpDir, filePath + '.tmp')))
   // Try to prevent weird bug with NFS by forcing syncing file before reading it
-  const fd = await fs.open(tmpDir + filePath, 'r')
+  const fd = await fs.open(path.join(tmpDir, filePath + '.tmp'), 'r')
   await fs.fsync(fd)
   await fs.close(fd)
   // write in tmp file then move it for a safer operation that doesn't create partial files
-  // await fs.move(tmpDir + filePath + '.tmp', tmpDir + filePath, { overwrite: true })
+  await fs.move(path.join(tmpDir, filePath + '.tmp'), path.join(tmpDir, filePath), { overwrite: true })
 }
 
 exports.download = async (url, axios, tmpDir, log) => {
   const fileName = path.parse(url.pathname).base
-  if (await fs.pathExists(tmpDir + fileName)) {
+  if (await fs.pathExists(path.join(tmpDir, fileName))) {
     log.info(`le fichier ${fileName} a déjà été téléchargé`)
   } else {
     log.info(`téléchargement du fichier ${fileName}`)
@@ -59,7 +59,7 @@ exports.download = async (url, axios, tmpDir, log) => {
     })
   }
 
-  if (await fs.pathExists(tmpDir + fileName.split('.')[0])) {
+  if (await fs.pathExists(path.join(tmpDir, fileName.split('.')[0]))) {
     log.info(`le fichier ${fileName.split('.')[0]} a déjà été décompressé`)
   } else if (fileName.endsWith('.7z') || fileName.endsWith('.7z.001')) {
     log.info(`extraction de l'archive ${fileName}`)
