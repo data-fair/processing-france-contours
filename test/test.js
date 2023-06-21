@@ -9,9 +9,8 @@ describe('France contours processing', function () {
     const context = testUtils.context({
       pluginConfig: {},
       processingConfig: {
-        clearFiles: false,
+        clearFiles: true,
         skipUpload: false,
-        forceConvert: true,
         datasetIdPrefix: 'france-contours-test',
         simplifyLevel: 'simple'
       },

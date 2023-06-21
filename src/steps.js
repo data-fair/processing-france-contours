@@ -42,18 +42,23 @@ exports.download = async (url, axios, tmpDir, log) => {
         const ftp = new FTPClient()
         const serverMessage = await ftp.connect({ host: url.host, user: url.username, password: url.password })
         await log.info('connecté au ftp : ' + serverMessage)
-        await log.info('Début du téléchargement')
+        await log.info('Début du téléchargement ftp')
         await pump(await ftp.get(url.pathname), writeStream)
         await log.info('Fin du téléchargement')
         await ftp.end()
       } else {
         await log.info('Début du téléchargement')
-        const res = await axios({ url: url.href, method: 'GET', responseType: 'stream' })
-        if (res) {
-          await pump(res.data, writeStream)
-          await log.info('Fin du téléchargement')
-        } else {
-          throw new Error(`échec à la récupération du fichier ${fileName}`)
+        let res
+        let i = 0
+        while (!res && i < 10) {
+          try {
+            res = await axios({ url: url.href, method: 'GET', responseType: 'stream' })
+            await pump(res.data, writeStream)
+            await log.info('Fin du téléchargement')
+          } catch (err) {
+            await log.warning(`échec à la récupération du fichier ${fileName}, nouvel essai...`)
+          }
+          i++
         }
       }
     })
@@ -63,8 +68,7 @@ exports.download = async (url, axios, tmpDir, log) => {
     log.info(`le fichier ${fileName.split('.')[0]} a déjà été décompressé`)
   } else if (fileName.endsWith('.7z') || fileName.endsWith('.7z.001')) {
     log.info(`extraction de l'archive ${fileName}`)
-    const { stderr } = await exec(`7z x -y ${tmpDir}${fileName} -o${tmpDir}`)
-    if (stderr) throw new Error(`échec à l'extraction de l'archive ${fileName} : ${stderr}`)
+    await exec(`7z x -y ${path.join(tmpDir)}${fileName} -o${path.join(tmpDir)}`)
   }
 }
 
