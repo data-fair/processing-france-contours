@@ -98,7 +98,7 @@ exports.normalize = async (geojsonPaths, normalizedPath, mapping, tmpDir, log) =
   log.info('normalisation du contenu')
   await withStreamableFile(normalizedPath, tmpDir, async (writeStream) => {
     await pump(
-      new MultiStream(geojsonPaths.map(geojsonPath => fs.createReadStream(tmpDir + geojsonPath))),
+      new MultiStream(geojsonPaths.map(geojsonPath => fs.createReadStream(path.join(tmpDir, geojsonPath)))),
       JSONStream.parse('features.*'),
       new Transform({
         objectMode: true,
