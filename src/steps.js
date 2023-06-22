@@ -68,7 +68,8 @@ exports.download = async (url, axios, tmpDir, log) => {
     log.info(`le fichier ${fileName.split('.')[0]} a déjà été décompressé`)
   } else if (fileName.endsWith('.7z') || fileName.endsWith('.7z.001')) {
     log.info(`extraction de l'archive ${fileName}`)
-    await exec(`7z x -y ${path.join(tmpDir)}${fileName} -o${path.join(tmpDir)}`)
+    log.info('test : ' + `7z x -y ${path.join(tmpDir, fileName)} -o${path.join(tmpDir)}`)
+    await exec(`7z x -y ${path.join(tmpDir, fileName)} -o${path.join(tmpDir)}`)
   }
 }
 
