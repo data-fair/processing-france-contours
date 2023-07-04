@@ -1,4 +1,4 @@
-// revers order is important, data from recent years are used to complete older data
+// reverse order is important, data from recent years are used to complete older data
 exports.years = [2023, 2022, 2021, 2020, 2019, 2018, 2017]
 // exports.years = [2023]
 

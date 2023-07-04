@@ -18,25 +18,25 @@ function displayBytes (aSize) {
   }
 }
 
-const withStreamableFile = async (filePath, tmpDir, fn) => {
+const withStreamableFile = async (filePath, fn) => {
   // creating empty file before streaming seems to fix some weird bugs with NFS
-  await fs.ensureFile(path.join(tmpDir, filePath + '.tmp'))
-  await fn(fs.createWriteStream(path.join(tmpDir, filePath + '.tmp')))
+  await fs.ensureFile(filePath + '.tmp')
+  await fn(fs.createWriteStream(filePath + '.tmp'))
   // Try to prevent weird bug with NFS by forcing syncing file before reading it
-  const fd = await fs.open(path.join(tmpDir, filePath + '.tmp'), 'r')
+  const fd = await fs.open(filePath + '.tmp', 'r')
   await fs.fsync(fd)
   await fs.close(fd)
   // write in tmp file then move it for a safer operation that doesn't create partial files
-  await fs.move(path.join(tmpDir, filePath + '.tmp'), path.join(tmpDir, filePath), { overwrite: true })
+  await fs.move(filePath + '.tmp', filePath, { overwrite: true })
 }
 
-exports.download = async (url, axios, tmpDir, log) => {
+exports.download = async (url, axios, log) => {
   const fileName = path.parse(url.pathname).base
-  if (await fs.pathExists(path.join(tmpDir, fileName))) {
+  if (await fs.pathExists(fileName)) {
     log.info(`le fichier ${fileName} a déjà été téléchargé`)
   } else {
     log.info(`téléchargement du fichier ${fileName}`)
-    await withStreamableFile(fileName, tmpDir, async (writeStream) => {
+    await withStreamableFile(fileName, async (writeStream) => {
       if (url.protocol === 'ftp:') {
         const FTPClient = require('promise-ftp')
         const ftp = new FTPClient()
@@ -64,27 +64,27 @@ exports.download = async (url, axios, tmpDir, log) => {
     })
   }
 
-  if (await fs.pathExists(path.join(tmpDir, fileName.split('.')[0]))) {
+  if (await fs.pathExists(fileName.split('.')[0])) {
     log.info(`le fichier ${fileName.split('.')[0]} a déjà été décompressé`)
   } else if (fileName.endsWith('.7z') || fileName.endsWith('.7z.001')) {
     log.info(`extraction de l'archive ${fileName}`)
-    log.info('test : ' + `7z x -y ${path.join(tmpDir, fileName)} -o${path.join(tmpDir)}`)
-    await exec(`7z x -y ${path.join(tmpDir, fileName)} -o${path.join(tmpDir)}`)
+    log.info('test : ' + `7z x -y ${fileName}`)
+    await exec(`7z x -y ${fileName}`)
   }
 }
 
-exports.convert = async (filePath, geojsonPath, simplify, tmpDir, log, forceConvert) => {
+exports.convert = async (filePath, geojsonPath, simplify, log, forceConvert) => {
   if (await fs.pathExists(geojsonPath) && !forceConvert) {
     log.info(`le fichier a déjà été converti ${geojsonPath}`)
   } else {
     log.info(`conversion au format geojson ${geojsonPath} ${simplify}`)
-    await withStreamableFile(geojsonPath, tmpDir, async (writeStream) => {
+    await withStreamableFile(geojsonPath, async (writeStream) => {
       const options = ['-lco', 'RFC7946=YES', '-lco', 'ENCODING=UTF-8', '-t_srs', 'EPSG:4326']
       if (simplify) {
         options.push('-simplify')
         options.push(simplify)
       }
-      const geoJsonStream = ogr2ogr(path.join(tmpDir, filePath))
+      const geoJsonStream = ogr2ogr(filePath)
         .format('GeoJSON')
         .options(options)
         .timeout(6000000)
@@ -94,11 +94,11 @@ exports.convert = async (filePath, geojsonPath, simplify, tmpDir, log, forceConv
   }
 }
 
-exports.normalize = async (geojsonPaths, normalizedPath, mapping, tmpDir, log) => {
+exports.normalize = async (geojsonPaths, normalizedPath, mapping, log) => {
   log.info('normalisation du contenu')
-  await withStreamableFile(normalizedPath, tmpDir, async (writeStream) => {
+  await withStreamableFile(normalizedPath, async (writeStream) => {
     await pump(
-      new MultiStream(geojsonPaths.map(geojsonPath => fs.createReadStream(path.join(tmpDir, geojsonPath)))),
+      new MultiStream(geojsonPaths.map(geojsonPath => fs.createReadStream(geojsonPath))),
       JSONStream.parse('features.*'),
       new Transform({
         objectMode: true,

@@ -9,16 +9,6 @@
         "type": "boolean",
         "default": true
       },
-      "skipUpload": {
-        "title": "ne pas charger les jeux de données",
-        "type": "boolean",
-        "default": false
-      },
-      "forceConvert": {
-        "title": "forcer la conversion des fichiers",
-        "type": "boolean",
-        "default": true
-      },
       "simplifyLevel": {
         "title": "niveau de simplification",
         "type": "string",
