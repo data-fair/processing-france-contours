@@ -16,8 +16,9 @@ describe('France contours processing', function () {
         clearFiles: false,
         // these parameters are only supported for tests
         skipUpload: true,
-        // forceConvert: true,
-        years: ['2023']
+        forceConvert: true
+        // years: ['2020'],
+        // levels: ['region']
       }
     }, config, false)
     const cwd = process.cwd()

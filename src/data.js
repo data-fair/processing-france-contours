@@ -1,37 +1,35 @@
 // reverse order is important, data from recent years are used to complete older data
 exports.years = [2023, 2022, 2021, 2020, 2019, 2018, 2017]
-// exports.years = [2023]
 
 // order is important, data from higher levels are used to complete lower levels
 exports.levels = ['region', 'departement', 'epci', 'commune', 'arrondissement-municipal', 'iris']
-// exports.levels = ['region']
 
 // geometry simplification
 exports.simplifyLevels = {
   full: {},
   precise: {
-    region: '6',
-    departement: '4',
-    epci: '2',
-    commune: '2',
-    'arrondissement-municipal': '2',
-    iris: '2'
+    region: '0.0003',
+    departement: '0.0002',
+    epci: '0.0001',
+    commune: '0.0001',
+    'arrondissement-municipal': '0.0001',
+    iris: '0.0001'
   },
   medium: {
-    region: '30',
-    departement: '20',
-    epci: '10',
-    commune: '10',
-    'arrondissement-municipal': '10',
-    iris: '10'
+    region: '0.0030',
+    departement: '0.0020',
+    epci: '0.0010',
+    commune: '0.0010',
+    'arrondissement-municipal': '0.0010',
+    iris: '0.0010'
   },
   simple: {
-    region: '150',
-    departement: '100',
-    epci: '50',
-    commune: '50',
-    'arrondissement-municipal': '50',
-    iris: '50'
+    region: '0.030',
+    departement: '0.020',
+    epci: '0.010',
+    commune: '0.010',
+    'arrondissement-municipal': '0.010',
+    iris: '0.010'
   }
 }
 
@@ -86,16 +84,16 @@ const adminExpressPrefixes = {
   2019: 'ADMIN-EXPRESS-COG_2-0__SHP__FRA_2019-09-24/ADMIN-EXPRESS-COG/1_DONNEES_LIVRAISON_2019-09-24',
   2020: 'ADMIN-EXPRESS-COG_2-1__SHP__FRA_2020-11-20/ADMIN-EXPRESS-COG/1_DONNEES_LIVRAISON_2020-11-20',
   2021: 'ADMIN-EXPRESS-COG_3-0__SHP_WGS84G_FRA_2021-05-19/ADMIN-EXPRESS-COG/1_DONNEES_LIVRAISON_2021-05-19',
-  2022: 'ADMIN-EXPRESS-COG_3-1__SHP__FRA_WM_2022-04-15/ADMIN-EXPRESS-COG/1_DONNEES_LIVRAISON_2022-04-15',
+  2022: 'ADMIN-EXPRESS-COG_3-1__SHP_WGS84G_FRA_2022-04-15/ADMIN-EXPRESS-COG/1_DONNEES_LIVRAISON_2022-04-15',
   2023: 'ADMIN-EXPRESS-COG_3-2__SHP_WGS84G_FRA_2023-05-03/ADMIN-EXPRESS-COG/1_DONNEES_LIVRAISON_2023-05-03'
 }
 const adminExpressDirs = {
   2017: ['ADE-COG_1-0_SHP_LAMB93_FR', 'ADE-COG_1-0_SHP_UTM20W84GUAD_D971', 'ADE-COG_1-0_SHP_UTM20W84MART_D972', 'ADE-COG_1-0_SHP_UTM22RGFG95_D973', 'ADE-COG_1-0_SHP_RGR92UTM40S_D974', 'ADE-COG_1-0_SHP_RGM04UTM38S_D976'],
-  2019: ['ADE-COG_2-0_SHP_WGS84G_FRA'],
+  2019: ['ADE-COG_2-0_SHP_WGS84_FR'],
+  2020: ['ADE-COG_2-1_SHP_WGS84G_FRA'],
   2021: ['ADECOG_3-0_SHP_WGS84G_FRA']
 }
 adminExpressDirs[2018] = adminExpressDirs[2017].map(dir => dir.replace('COG_1-0', 'COG_1-1'))
-adminExpressDirs[2020] = adminExpressDirs[2019].map(dir => dir.replace('COG_2-0', 'COG_2-1'))
 adminExpressDirs[2022] = adminExpressDirs[2021].map(dir => dir.replace('COG_3-0', 'COG_3-1'))
 adminExpressDirs[2023] = adminExpressDirs[2021].map(dir => dir.replace('COG_3-0', 'COG_3-2'))
 const adminExpressShp = {
@@ -107,7 +105,7 @@ const adminExpressShp = {
   iris: 'CONTOURS-IRIS'
 }
 const irisPrefixes = {
-  2017: 'CONTOURS-IRIS_2-1__SHP__FRA_2017-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2018-06-00105',
+  2017: 'CONTOURS-IRIS_2-1__SHP__FRA_2018-06-08/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2018-06-00105',
   2018: 'CONTOURS-IRIS_2-1__SHP__FRA_2018-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2018-07-00057',
   2019: 'CONTOURS-IRIS_2-1__SHP__FRA_2020-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2020-01-00139',
   2020: 'CONTOURS-IRIS_2-1__SHP__FRA_2020-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2020-12-00282',
@@ -206,8 +204,8 @@ exports.getMappings = (year) => {
           niveau: 'commune',
           annee: 2017,
           ...props,
-          NOM_REG: memory[`reg-${props.INSEE_REG}`].NOM_REG,
-          NOM_DEP: memory[`dep-${props.INSEE_DEP}`].NOM_DEP,
+          NOM_REG: memory[`reg-${props.INSEE_REG}`]?.NOM_REG,
+          NOM_DEP: memory[`dep-${props.INSEE_DEP}`]?.NOM_DEP,
           ...epci
         })
       }

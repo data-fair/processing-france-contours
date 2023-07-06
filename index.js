@@ -7,20 +7,22 @@ exports.run = async ({ pluginConfig, processingConfig, axios, log, patchConfig }
 
   for (const year of (processingConfig.years || years).map(y => y).sort().reverse()) {
     const mappings = getMappings(year)
-    for (const level of levels) {
+    for (const level of (processingConfig.levels || levels)) {
       await log.step(`Année ${year}, niveau ${level}`)
 
       await download(getUrl(year, level), axios, log)
 
       const geojsonPaths = []
       for (const p of getPaths(year, level)) {
+        if (!await fs.pathExists(p)) throw new Error(`missing file ${p}`)
+
         const geojsonPath = `${p}-${processingConfig.simplifyLevel}.geojson`
-        try {
-          await convert(p, geojsonPath, simplifyLevel[level], log, processingConfig.forceConvert)
-          geojsonPaths.push(geojsonPath)
-        } catch (e) {
-          await log.error(`échec à la conversion du fichier ${p}`)
-        }
+        // try {
+        await convert(p, geojsonPath, simplifyLevel[level], log, processingConfig.forceConvert)
+        geojsonPaths.push(geojsonPath)
+        // } catch (e) {
+        //  await log.error(`échec à la conversion du fichier ${p} : ${e.message}`)
+        // }
       }
       if (geojsonPaths.length !== 0) {
         const normGeojsonPath = `${year}-${level}-${processingConfig.simplifyLevel}-normalized.geojson`

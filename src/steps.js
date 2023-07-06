@@ -50,16 +50,20 @@ exports.download = async (url, axios, log) => {
         await log.info('Début du téléchargement')
         let res
         let i = 0
+        let err
         while (!res && i < 10) {
           try {
             res = await axios({ url: url.href, method: 'GET', responseType: 'stream' })
             await pump(res.data, writeStream)
+            err = null
             await log.info('Fin du téléchargement')
-          } catch (err) {
+          } catch (_err) {
+            err = _err
             await log.warning(`échec à la récupération du fichier ${fileName}, nouvel essai...`)
           }
           i++
         }
+        if (err) throw err
       }
     })
   }
