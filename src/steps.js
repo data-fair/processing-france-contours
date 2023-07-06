@@ -98,7 +98,7 @@ exports.convert = async (filePath, geojsonPath, simplify, log, forceConvert) => 
   }
 }
 
-exports.normalize = async (geojsonPaths, normalizedPath, mapping, log) => {
+exports.normalize = async (geojsonPaths, normalizedPath, mapping, validate, log) => {
   log.info('normalisation du contenu')
   await withStreamableFile(normalizedPath, async (writeStream) => {
     await pump(
@@ -109,6 +109,7 @@ exports.normalize = async (geojsonPaths, normalizedPath, mapping, log) => {
         transform (feature, encoding, callback) {
           // console.log(feature.properties)
           Object.assign(feature, mapping(feature.properties))
+          validate(feature)
           // console.log(feature.id, JSON.stringify(feature.properties))
           callback(null, feature)
         }

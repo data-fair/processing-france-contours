@@ -107,7 +107,7 @@ const adminExpressShp = {
 const irisPrefixes = {
   2017: 'CONTOURS-IRIS_2-1__SHP__FRA_2018-06-08/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2018-06-00105',
   2018: 'CONTOURS-IRIS_2-1__SHP__FRA_2018-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2018-07-00057',
-  2019: 'CONTOURS-IRIS_2-1__SHP__FRA_2020-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2020-01-00139',
+  2019: 'CONTOURS-IRIS_2-1__SHP__FRA_2019-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2020-01-00139',
   2020: 'CONTOURS-IRIS_2-1__SHP__FRA_2020-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2020-12-00282',
   2021: 'CONTOURS-IRIS_2-1__SHP__FRA_2021-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2021-06-00217',
   2022: 'CONTOURS-IRIS_2-1__SHP__FRA_2022-01-01/CONTOURS-IRIS/1_DONNEES_LIVRAISON_2022-06-00180',
@@ -138,97 +138,119 @@ exports.getPaths = (year, level) => {
 // object used to store some data useful to read info from one level to another
 const memory = {}
 
-// fix keys order in object
-const sortKeys = (obj) => {
-  const keys = Object.keys(obj).sort((a, b) => {
-    const partsA = a.split('_')
-    const partsB = b.split('_')
-    if (partsA.length !== partsB.length) return partsA.length - partsB.length
-    const comp1 = partsA.pop().localeCompare(partsB.pop())
-    if (comp1 !== 0) return comp1
-    return partsA.pop().localeCompare(partsB.pop()) * -1
-  })
-  return keys.reduce((clone, key) => { clone[key] = obj[key]; return clone }, {})
+const switchProp = (o, n1, n2) => {
+  if (o[n1]) {
+    o[n2] = o[n1]
+    delete o[n1]
+  }
 }
 
 exports.getMappings = (year) => {
   return {
     region: (props) => {
       delete props.ID
+      delete props.NOM_REG_M
+      delete props.NOM_M
+      switchProp(props, 'NOM', 'NOM_REG')
       memory[`reg-${props.INSEE_REG}`] = memory[`reg-${props.INSEE_REG}`] ||
         { NOM_REG: props.NOM_REG, CHF_REG: props.CHF_REG }
       return {
         id: `reg-${year}-${props.INSEE_REG}`,
-        properties: sortKeys({
+        properties: {
           niveau: 'région',
           annee: year,
           ...props,
           ...memory[`reg-${props.INSEE_REG}`] // use the data from most recent year (more complete)
-        })
+        }
       }
     },
     departement: (props) => {
       delete props.ID
+      delete props.NOM_DEP_M
+      delete props.NOM_M
+      switchProp(props, 'NOM', 'NOM_DEP')
       memory[`dep-${props.INSEE_DEP}`] = memory[`dep-${props.INSEE_DEP}`] ||
         { NOM_DEP: props.NOM_DEP, CHF_DEP: props.CHF_DEP }
       return {
         id: `dep-${year}-${props.INSEE_DEP}`,
-        properties: sortKeys({
+        properties: {
           niveau: 'département',
           annee: year,
           ...props,
           ...memory[`dep-${props.INSEE_DEP}`], // use the data from most recent year (more complete)
           NOM_REG: memory[`reg-${props.INSEE_REG}`].NOM_REG
-        })
+        }
       }
     },
     epci: (props) => {
       delete props.ID
+      switchProp(props, 'NOM', 'NOM_EPCI')
+      switchProp(props, 'CODE_SIREN', 'CODE_EPCI')
+      switchProp(props, 'NATURE', 'TYPE_EPCI')
       const id = `epci-${year}-${props.CODE_EPCI}`
       memory[id] = { NOM_EPCI: props.NOM_EPCI, TYPE_EPCI: props.TYPE_EPCI }
       return {
         id,
-        properties: sortKeys({
+        properties: {
           niveau: 'EPCI',
           annee: 2017,
           ...props
-        })
+        }
       }
     },
     commune: (props) => {
       delete props.ID
-      const epci = memory[`epci-${year}-${props.CODE_EPCI}`]
+      delete props.NOM_COM_M
+      delete props.TYPE
+      delete props.NOM_M
+      props.INSEE_CAN = props.INSEE_CAN || ''
+      switchProp(props, 'NOM', 'NOM_COM')
+      if (props.SIREN_EPCI) {
+        props.CODE_EPCI = props.SIREN_EPCI.split('/')[0]
+        delete props.SIREN_EPCI
+      }
+      const epci = (props.CODE_EPCI === 'ZZZZZZZZZ' || props.CODE_EPCI === 'NR' || props.CODE_EPCI === 'NC' || props.CODE_EPCI === null)
+        ? { CODE_EPCI: '', NOM_EPCI: '', TYPE_EPCI: '' }
+        : memory[`epci-${year}-${props.CODE_EPCI}`]
       return {
         id: `com-${year}-${props.INSEE_COM}`,
-        properties: sortKeys({
+        properties: {
           niveau: 'commune',
           annee: 2017,
           ...props,
           NOM_REG: memory[`reg-${props.INSEE_REG}`]?.NOM_REG,
           NOM_DEP: memory[`dep-${props.INSEE_DEP}`]?.NOM_DEP,
           ...epci
-        })
+        }
       }
     },
     'arrondissement-municipal': (props) => {
       delete props.ID
+      delete props.TYPE
+      delete props.NOM_COM_M
+      delete props.NOM_M
+      switchProp(props, 'NOM', 'NOM_COM')
+      if (props.INSEE_ARM) {
+        switchProp(props, 'INSEE_COM', 'INSEE_RATT')
+        switchProp(props, 'INSEE_ARM', 'INSEE_COM')
+      }
       return {
-        id: `arm-${year}-${props.INSEE_ARM}`,
-        properties: sortKeys({
+        id: `arm-${year}-${props.INSEE_COM}`,
+        properties: {
           niveau: 'arrondissement municipal',
           annee: year,
           ...props
-        })
+        }
       }
     },
     iris: (props) => {
       return {
         id: `iris-${year}-${props.CODE_IRIS}`,
-        properties: sortKeys({
+        properties: {
           niveau: 'IRIS',
           annee: year,
           ...props
-        })
+        }
       }
     }
   }
@@ -238,33 +260,49 @@ exports.getMappings = (year) => {
  * schemas used for upload step
  */
 
-const inseeReg = { key: 'INSEE_REG', 'x-originalName': 'INSEE_REG', title: 'Code région', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeRegion' }
-const nomReg = { key: 'NOM_REG', 'x-originalName': 'NOM_REG', title: 'Nom région', type: 'string' }
-const chfReg = { key: 'CHF_REG', 'x-originalName': 'CHF_REG', title: 'Code chef lieu région', type: 'string' }
-const inseeDep = { key: 'INSEE_DEP', 'x-originalName': 'INSEE_DEP', title: 'Code département', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeDepartement' }
-const nomDep = { key: 'NOM_DEP', 'x-originalName': 'NOM_DEP', title: 'Nom département', type: 'string' }
-const chfDep = { key: 'CHF_DEP', 'x-originalName': 'CHF_DEP', title: 'Code chef lieu département', type: 'string' }
-const typeEpci = { key: 'TYPE_EPCI', 'x-originalName': 'TYPE_EPCI', title: 'Type EPCI', type: 'string' }
-const nomEpci = { key: 'NOM_EPCI', 'x-originalName': 'NOM_EPCI', title: 'Nom EPCI', type: 'string' }
-const codeEpci = { key: 'CODE_EPCI', 'x-originalName': 'CODE_EPCI', title: 'Code EPCI', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#EtablissementPublicDeCooperationIntercommunale' }
-const inseeCom = { key: 'INSEE_COM', 'x-originalName': 'INSEE_COM', title: 'Code commune', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeCommune' }
-const nomCom = { key: 'NOM_COM', 'x-originalName': 'NOM_COM', title: 'Nom commune', type: 'string', 'x-refersTo': 'http://schema.org/City' }
-const nomArm = { key: 'NOM_ARM', 'x-originalName': 'NOM_ARM', title: 'Nom arrondissement municipal', type: 'string' }
-const inseeArm = { key: 'INSEE_ARM', 'x-originalName': 'INSEE_ARM', title: 'Code arrondissement municipal', type: 'string', ignoreDetection: true }
-const pop = { key: 'POPULATION', 'x-originalName': 'POPULATION', title: 'Population', type: 'string' }
-const statut = { key: 'STATUT', 'x-originalName': 'STATUT', title: 'Statut', type: 'string' }
+const niveau = { key: 'niveau', title: 'Niveau', type: 'string' }
+const annee = { key: 'annee', title: 'Année', type: 'integer' }
+const inseeReg = { key: 'INSEE_REG', title: 'Code région', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeRegion' }
+const nomReg = { key: 'NOM_REG', title: 'Nom région', type: 'string' }
+const chfReg = { key: 'CHF_REG', title: 'Code chef lieu région', type: 'string' }
+const inseeDep = { key: 'INSEE_DEP', title: 'Code département', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeDepartement' }
+const nomDep = { key: 'NOM_DEP', title: 'Nom département', type: 'string' }
+const chfDep = { key: 'CHF_DEP', title: 'Code chef lieu département', type: 'string' }
+const typeEpci = { key: 'TYPE_EPCI', title: 'Type EPCI', type: 'string' }
+const nomEpci = { key: 'NOM_EPCI', title: 'Nom EPCI', type: 'string' }
+const codeEpci = { key: 'CODE_EPCI', title: 'Code EPCI', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#EtablissementPublicDeCooperationIntercommunale' }
+const inseeCom = { key: 'INSEE_COM', title: 'Code commune', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeCommune' }
+const nomCom = { key: 'NOM_COM', title: 'Nom commune', type: 'string', 'x-refersTo': 'http://schema.org/City' }
+const inseeRatt = { key: 'INSEE_RATT', title: 'Code de la commmune parente', type: 'string', ignoreDetection: true }
+const pop = { key: 'POPULATION', title: 'Population', type: 'string' }
+const statut = { key: 'STATUT', title: 'Statut', type: 'string' }
 
-const inseeArr = { key: 'INSEE_ARR', 'x-originalName': 'INSEE_ARR', title: 'Code arrondissement', type: 'string', ignoreDetection: true }
-const inseeCan = { key: 'INSEE_CAN', 'x-originalName': 'INSEE_CAN', title: 'Code canton', type: 'string', ignoreDetection: true }
-const typeIris = { key: 'TYP_IRIS', 'x-originalName': 'TYP_IRIS', title: 'Type IRIS', type: 'string' }
-const nomIris = { key: 'NOM_IRIS', 'x-originalName': 'NOM_IRIS', title: 'Nom IRIS', type: 'string' }
-const codeIris = { key: 'CODE_IRIS', 'x-originalName': 'CODE_IRIS', title: 'Code IRIS', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeIRIS' }
+const inseeArr = { key: 'INSEE_ARR', title: 'Code arrondissement', type: 'string', ignoreDetection: true }
+const inseeCan = { key: 'INSEE_CAN', title: 'Code canton', type: 'string', ignoreDetection: true }
+const typeIris = { key: 'TYP_IRIS', title: 'Type IRIS', type: 'string' }
+const nomIris = { key: 'NOM_IRIS', title: 'Nom IRIS', type: 'string' }
+const iris = { key: 'IRIS', title: 'IRIS', type: 'string', ignoreDetection: true }
+const codeIris = { key: 'CODE_IRIS', title: 'Code IRIS', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeIRIS' }
 
 exports.schemas = {
-  region: [nomReg, inseeReg, chfReg],
-  departement: [nomDep, inseeDep, chfDep, nomReg, inseeReg],
-  epci: [nomEpci, codeEpci, typeEpci],
-  commune: [nomCom, inseeCom, statut, pop, inseeArr, inseeCan, nomReg, inseeReg, nomDep, inseeDep, nomEpci, codeEpci, typeEpci],
-  'arrondissement-municipal': [nomArm, inseeArm, pop, inseeCom],
-  iris: [nomIris, codeIris, typeIris, nomCom, inseeCom]
+  region: [niveau, annee, nomReg, inseeReg, chfReg],
+  departement: [niveau, annee, nomDep, inseeDep, chfDep, nomReg, inseeReg],
+  epci: [niveau, annee, nomEpci, codeEpci, typeEpci],
+  commune: [niveau, annee, nomCom, inseeCom, statut, pop, inseeArr, inseeCan, nomReg, inseeReg, nomDep, inseeDep, nomEpci, codeEpci, typeEpci],
+  'arrondissement-municipal': [niveau, annee, nomCom, inseeCom, pop, inseeRatt],
+  iris: [niveau, annee, iris, nomIris, codeIris, typeIris, nomCom, inseeCom]
+}
+
+exports.validate = (schema) => {
+  const schemaKeys = schema.map(p => p.key)
+  return (line) => {
+    const lineKeys = Object.keys(line.properties)
+    for (const key of schemaKeys) {
+      if (!lineKeys.includes(key)) throw new Error(`missing key ${key} : ${JSON.stringify(line.properties)}`)
+    }
+    for (const key of lineKeys) {
+      if (!schemaKeys.includes(key)) throw new Error(`additional key ${key} : ${JSON.stringify(line.properties)}`)
+    }
+    if (line.id.includes('undefined')) throw new Error(`bad line id ${line.id} : ${JSON.stringify(line)}`)
+  }
 }
