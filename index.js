@@ -14,7 +14,11 @@ exports.run = async ({ pluginConfig, processingConfig, axios, log, patchConfig }
 
       const geojsonPaths = []
       for (const p of getPaths(year, level)) {
-        if (!await fs.pathExists(p)) throw new Error(`missing file ${p}`)
+        if (!await fs.pathExists(p)) {
+          // level arrondissement is not present on all files (for exemple shapefiles of DOM-TOM departments)
+          if (level === 'arrondissement-municipal') continue
+          throw new Error(`missing file ${p}`)
+        }
 
         const geojsonPath = `${p}-${processingConfig.simplifyLevel}.geojson`
         // try {
