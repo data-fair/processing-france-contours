@@ -20,8 +20,8 @@ exports.run = async ({ pluginConfig, processingConfig, axios, log, patchConfig }
           throw new Error(`missing file ${p}`)
         }
 
-        const geojsonPath = `${p}-${processingConfig.simplifyLevel}.geojson`
-        await convert(p, geojsonPath, simplifyLevel[level], log, processingConfig.forceConvert)
+        const geojsonPath = `${p}.geojson`
+        await convert(p, geojsonPath, log, processingConfig.forceConvert)
         geojsonPaths.push(geojsonPath)
       }
       if (geojsonPaths.length !== 0) {
@@ -35,6 +35,7 @@ exports.run = async ({ pluginConfig, processingConfig, axios, log, patchConfig }
           normGeojsonPath,
           mappings[level],
           validate(schema),
+          simplifyLevel,
           log
         )
 

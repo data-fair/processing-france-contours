@@ -12,13 +12,13 @@ describe('France contours processing', function () {
       pluginConfig: {},
       processingConfig: {
         datasetIdPrefix: 'france-contours-test',
-        simplifyLevel: 'medium',
+        simplifyLevel: 'simple',
         clearFiles: false,
         // these parameters are only supported for tests
         skipUpload: true,
-        forceConvert: true
+        // forceConvert: true
         // years: ['2020']
-        // levels: ['iris']
+        levels: ['iris']
       }
     }, config, false)
     const cwd = process.cwd()

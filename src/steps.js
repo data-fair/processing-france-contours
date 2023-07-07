@@ -77,17 +77,13 @@ exports.download = async (url, axios, log) => {
   }
 }
 
-exports.convert = async (filePath, geojsonPath, simplify, log, forceConvert) => {
+exports.convert = async (filePath, geojsonPath, log, forceConvert) => {
   if (await fs.pathExists(geojsonPath) && !forceConvert) {
     log.info(`le fichier a déjà été converti ${geojsonPath}`)
   } else {
-    log.info(`conversion au format geojson ${geojsonPath} ${simplify}`)
+    log.info(`conversion au format geojson ${geojsonPath}`)
     await withStreamableFile(geojsonPath, async (writeStream) => {
       const options = ['-lco', 'RFC7946=YES', '-lco', 'ENCODING=UTF-8', '-t_srs', 'EPSG:4326']
-      if (simplify) {
-        options.push('-simplify')
-        options.push(simplify)
-      }
       const geoJsonStream = ogr2ogr(filePath)
         .format('GeoJSON')
         .options(options)
@@ -98,7 +94,7 @@ exports.convert = async (filePath, geojsonPath, simplify, log, forceConvert) => 
   }
 }
 
-exports.normalize = async (geojsonPaths, normalizedPath, mapping, validate, log) => {
+exports.normalize = async (geojsonPaths, normalizedPath, mapping, validate, simplifyTolerance, log) => {
   log.info('normalisation du contenu')
   await withStreamableFile(normalizedPath, async (writeStream) => {
     await pump(
@@ -108,6 +104,10 @@ exports.normalize = async (geojsonPaths, normalizedPath, mapping, validate, log)
         objectMode: true,
         transform (feature, encoding, callback) {
           // console.log(feature.properties)
+          if (simplifyTolerance) {
+            const simplify = require('@turf/simplify')
+            simplify(feature, { tolerance: simplifyTolerance, highQuality: true, mutate: true })
+          }
           Object.assign(feature, mapping(feature.properties))
           validate(feature)
           // console.log(feature.id, JSON.stringify(feature.properties))

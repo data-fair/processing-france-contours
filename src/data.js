@@ -5,7 +5,7 @@ exports.years = [2023, 2022, 2021, 2020, 2019, 2018, 2017]
 exports.levels = ['region', 'departement', 'epci', 'commune', 'arrondissement-municipal', 'iris']
 
 // geometry simplification
-exports.simplifyLevels = {
+/* exports.simplifyLevels = {
   full: {},
   precise: {
     region: '0.0003',
@@ -31,6 +31,12 @@ exports.simplifyLevels = {
     'arrondissement-municipal': '0.010',
     iris: '0.010'
   }
+} */
+exports.simplifyLevels = {
+  full: null,
+  precise: 0.0001,
+  medium: 0.001,
+  simple: 0.01
 }
 
 // données admin express COG pour des tracés géographique en accord avec la nomenclature insee du découpage territorial
@@ -116,7 +122,7 @@ const irisPrefixes = {
 const irisDirs = {
   2017: ['CONTOURS-IRIS_2-1_SHP_LAMB93_FXX-2017', 'CONTOURS-IRIS_2-1_SHP_RGM04UTM38S_MYT-2017', 'CONTOURS-IRIS_2-1_SHP_RGR92UTM40S_REU-2017', 'CONTOURS-IRIS_2-1_SHP_RGSPM06U21_SPM-2017', 'CONTOURS-IRIS_2-1_SHP_UTM20W84GUAD_GLP-2017', 'CONTOURS-IRIS_2-1_SHP_UTM20W84MART_MTQ-2017', 'CONTOURS-IRIS_2-1_SHP_UTM22RGFG95_GUF-2017'],
   2019: ['CONTOURS-IRIS_2-1_SHP_LAMB93_FXX-2019', 'CONTOURS-IRIS_2-1_SHP_RGM04UTM38S_MYT-2019', 'CONTOURS-IRIS_2-1_SHP_RGR92UTM40S_REU-2019', 'CONTOURS-IRIS_2-1_SHP_RGAF09UTM20_GLP-2019', 'CONTOURS-IRIS_2-1_SHP_RGAF09UTM20_MTQ-2019', 'CONTOURS-IRIS_2-1_SHP_UTM22RGFG95_GUF-2019'],
-  2020: ['CONTOURS-IRIS_2-1_SHP_LAMB93_FXX-2020', 'CONTOURS-IRIS_2-1_SHP_LAMB93_FXX-2020', 'CONTOURS-IRIS_2-1_SHP_RGR92UTM40S_REU-2020', 'CONTOURS-IRIS_2-1_SHP_RGAF09UTM20_GLP-2020', 'CONTOURS-IRIS_2-1_SHP_RGAF09UTM20_MTQ-2020', 'CONTOURS-IRIS_2-1_SHP_UTM22RGFG95_GUF-2020']
+  2020: ['CONTOURS-IRIS_2-1_SHP_LAMB93_FXX-2020', 'CONTOURS-IRIS_2-1_SHP_RGR92UTM40S_REU-2020', 'CONTOURS-IRIS_2-1_SHP_RGAF09UTM20_GLP-2020', 'CONTOURS-IRIS_2-1_SHP_RGAF09UTM20_MTQ-2020', 'CONTOURS-IRIS_2-1_SHP_UTM22RGFG95_GUF-2020']
 }
 irisDirs[2018] = irisDirs[2017].map(dir => dir.replace('2017', '2018'))
 irisDirs[2021] = irisDirs[2019].map(dir => dir.replace('2019', '2021'))
