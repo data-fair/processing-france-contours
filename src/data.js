@@ -266,29 +266,39 @@ exports.getMappings = (year) => {
  * schemas used for upload step
  */
 
-const niveau = { key: 'niveau', title: 'Niveau', type: 'string' }
-const annee = { key: 'annee', title: 'Année', type: 'integer' }
-const inseeReg = { key: 'INSEE_REG', title: 'Code région', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeRegion' }
-const nomReg = { key: 'NOM_REG', title: 'Nom région', type: 'string' }
-const chfReg = { key: 'CHF_REG', title: 'Code chef lieu région', type: 'string' }
-const inseeDep = { key: 'INSEE_DEP', title: 'Code département', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeDepartement' }
-const nomDep = { key: 'NOM_DEP', title: 'Nom département', type: 'string' }
-const chfDep = { key: 'CHF_DEP', title: 'Code chef lieu département', type: 'string' }
-const typeEpci = { key: 'TYPE_EPCI', title: 'Type EPCI', type: 'string' }
-const nomEpci = { key: 'NOM_EPCI', title: 'Nom EPCI', type: 'string' }
-const codeEpci = { key: 'CODE_EPCI', title: 'Code EPCI', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#EtablissementPublicDeCooperationIntercommunale' }
-const inseeCom = { key: 'INSEE_COM', title: 'Code commune', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeCommune' }
-const nomCom = { key: 'NOM_COM', title: 'Nom commune', type: 'string', 'x-refersTo': 'http://schema.org/City' }
-const inseeRatt = { key: 'INSEE_RATT', title: 'Code de la commmune parente', type: 'string', ignoreDetection: true }
-const pop = { key: 'POPULATION', title: 'Population', type: 'string' }
-const statut = { key: 'STATUT', title: 'Statut', type: 'string' }
+const codeCapabilities = {
+  insensitive: false,
+  text: false,
+  textStandard: false
+}
 
-const inseeArr = { key: 'INSEE_ARR', title: 'Code arrondissement', type: 'string', ignoreDetection: true }
-const inseeCan = { key: 'INSEE_CAN', title: 'Code canton', type: 'string', ignoreDetection: true }
-const typeIris = { key: 'TYP_IRIS', title: 'Type IRIS', type: 'string' }
-const nomIris = { key: 'NOM_IRIS', title: 'Nom IRIS', type: 'string' }
-const iris = { key: 'IRIS', title: 'IRIS', type: 'string', ignoreDetection: true }
-const codeIris = { key: 'CODE_IRIS', title: 'Code IRIS', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeIRIS' }
+const labelCapabilities = {
+  textStandard: false
+}
+
+const niveau = { key: 'niveau', title: 'Niveau', type: 'string', 'x-capabilities': codeCapabilities }
+const annee = { key: 'annee', title: 'Année', type: 'integer' }
+const inseeReg = { key: 'INSEE_REG', title: 'Code région', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeRegion', 'x-capabilities': codeCapabilities }
+const nomReg = { key: 'NOM_REG', title: 'Nom région', type: 'string', 'x-capabilities': labelCapabilities }
+const chfReg = { key: 'CHF_REG', title: 'Code chef lieu région', type: 'string', 'x-capabilities': codeCapabilities }
+const inseeDep = { key: 'INSEE_DEP', title: 'Code département', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeDepartement', 'x-capabilities': codeCapabilities }
+const nomDep = { key: 'NOM_DEP', title: 'Nom département', type: 'string', 'x-capabilities': labelCapabilities }
+const chfDep = { key: 'CHF_DEP', title: 'Code chef lieu département', type: 'string', 'x-capabilities': codeCapabilities }
+const typeEpci = { key: 'TYPE_EPCI', title: 'Type EPCI', type: 'string', 'x-capabilities': codeCapabilities }
+const nomEpci = { key: 'NOM_EPCI', title: 'Nom EPCI', type: 'string', 'x-capabilities': labelCapabilities }
+const codeEpci = { key: 'CODE_EPCI', title: 'Code EPCI', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#EtablissementPublicDeCooperationIntercommunale', 'x-capabilities': codeCapabilities }
+const inseeCom = { key: 'INSEE_COM', title: 'Code commune', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeCommune', 'x-capabilities': codeCapabilities }
+const nomCom = { key: 'NOM_COM', title: 'Nom commune', type: 'string', 'x-refersTo': 'http://schema.org/City', 'x-capabilities': labelCapabilities }
+const inseeRatt = { key: 'INSEE_RATT', title: 'Code de la commmune parente', type: 'string', ignoreDetection: true, 'x-capabilities': codeCapabilities }
+const pop = { key: 'POPULATION', title: 'Population', type: 'integer' }
+const statut = { key: 'STATUT', title: 'Statut', type: 'string', 'x-capabilities': codeCapabilities }
+
+const inseeArr = { key: 'INSEE_ARR', title: 'Code arrondissement', type: 'string', ignoreDetection: true, 'x-capabilities': codeCapabilities }
+const inseeCan = { key: 'INSEE_CAN', title: 'Code canton', type: 'string', ignoreDetection: true, 'x-capabilities': codeCapabilities }
+const typeIris = { key: 'TYP_IRIS', title: 'Type IRIS', type: 'string', 'x-capabilities': codeCapabilities }
+const nomIris = { key: 'NOM_IRIS', title: 'Nom IRIS', type: 'string', 'x-capabilities': labelCapabilities }
+const iris = { key: 'IRIS', title: 'IRIS', type: 'string', ignoreDetection: true, 'x-capabilities': codeCapabilities }
+const codeIris = { key: 'CODE_IRIS', title: 'Code IRIS', type: 'string', ignoreDetection: true, 'x-refersTo': 'http://rdf.insee.fr/def/geo#codeIRIS', 'x-capabilities': codeCapabilities }
 
 exports.schemas = {
   region: [niveau, annee, nomReg, inseeReg, chfReg],
