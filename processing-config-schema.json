@@ -1,25 +1,149 @@
 {
   "type": "object",
-  "x-display": "tabs",
-  "allOf": [{
-    "title": "Paramètres",
-    "properties": {
-      "clearFiles": {
-        "title": "supprimer les fichiers téléchargés",
-        "type": "boolean",
-        "default": true
-      },
-      "simplifyLevel": {
-        "title": "niveau de simplification",
-        "type": "string",
-        "default": "medium",
-        "enum": ["full", "precise", "medium", "simple"]
-      },
-      "datasetIdPrefix": {
-        "title": "Préfixe des identifiants de jeux de données",
-        "type": "string",
-        "default": "france-contours"
+  "layout": "tabs",
+  "allOf": [
+    {
+      "title": "Périmètre",
+      "properties": {
+        "years": {
+          "type": "array",
+          "title": "Millésimes",
+          "description": "Un jeu de données est produit par millésime et par niveau. Les données proviennent des livraisons ADMIN-EXPRESS-COG et CONTOURS-IRIS de l'IGN (Géoplateforme).",
+          "layout": {
+            "comp": "checkbox-group"
+          },
+          "default": [
+            2026
+          ],
+          "items": {
+            "type": "integer",
+            "enum": [
+              2026,
+              2025,
+              2024,
+              2023,
+              2022,
+              2021,
+              2020,
+              2019,
+              2018,
+              2017
+            ]
+          }
+        },
+        "levels": {
+          "type": "array",
+          "title": "Niveaux administratifs",
+          "description": "Le niveau commune inclut par défaut les arrondissements municipaux de Paris, Lyon et Marseille (voir l'onglet Options).",
+          "layout": {
+            "comp": "checkbox-group",
+            "items": [
+              {
+                "value": "region",
+                "title": "Régions"
+              },
+              {
+                "value": "departement",
+                "title": "Départements"
+              },
+              {
+                "value": "epci",
+                "title": "EPCI"
+              },
+              {
+                "value": "commune",
+                "title": "Communes"
+              },
+              {
+                "value": "arrondissement-municipal",
+                "title": "Arrondissements municipaux (seuls)"
+              },
+              {
+                "value": "iris",
+                "title": "IRIS"
+              }
+            ]
+          },
+          "default": [
+            "region",
+            "departement",
+            "epci",
+            "commune"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "region",
+              "departement",
+              "epci",
+              "commune",
+              "arrondissement-municipal",
+              "iris"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Options",
+      "properties": {
+        "datasetIdPrefix": {
+          "type": "string",
+          "title": "Préfixe des slugs",
+          "description": "Les jeux de données sont identifiés par le slug `<préfixe>-<millésime>-<niveau>-<simplification>` (ex : `france-contours-2026-commune-medium`). Un jeu existant portant ce slug est mis à jour, sinon il est créé.",
+          "default": "france-contours"
+        },
+        "simplifyLevel": {
+          "type": "string",
+          "title": "Simplification géométrique",
+          "description": "Tolérance appliquée aux tracés (en degrés, après reprojection en WGS84) pour réduire le volume des données.",
+          "default": "medium",
+          "enum": [
+            "full",
+            "precise",
+            "medium",
+            "simple"
+          ],
+          "layout": {
+            "items": [
+              {
+                "value": "full",
+                "title": "Aucune (tracés IGN d'origine)"
+              },
+              {
+                "value": "precise",
+                "title": "Précise (0,0001°, ~10 m)"
+              },
+              {
+                "value": "medium",
+                "title": "Moyenne (0,001°, ~100 m)"
+              },
+              {
+                "value": "simple",
+                "title": "Forte (0,01°, ~1 km)"
+              }
+            ]
+          }
+        },
+        "combineCommunesAndPlm": {
+          "type": "boolean",
+          "title": "Fusionner communes et arrondissements municipaux (PLM)",
+          "description": "Pour le niveau commune, remplace les polygones de Paris, Lyon et Marseille par leurs arrondissements municipaux afin d'obtenir un découpage jointif sans superposition. La commune de rattachement est conservée dans la colonne `INSEE_RATT`.",
+          "default": true
+        },
+        "enableVtPrepare": {
+          "type": "boolean",
+          "title": "Pré-calculer les tuiles vectorielles",
+          "description": "Active la capacité `vtPrepare` sur la géométrie : Data Fair génère les tuiles vectorielles à l'indexation plutôt qu'à la demande.",
+          "default": true
+        },
+        "skipUpload": {
+          "type": "boolean",
+          "title": "Simulation (sans publication)",
+          "description": "Télécharge, convertit et normalise les données sans créer ni mettre à jour de jeu de données.",
+          "default": false
+        }
       }
     }
-  }]
+  ]
 }
