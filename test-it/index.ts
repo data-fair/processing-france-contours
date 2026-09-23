@@ -67,9 +67,9 @@ describe('Processing France Contours', () => {
     it('labels the technical enum values', () => {
       const levels = processingConfigSchema.allOf[0].properties.levels
       assert.deepEqual(levels.layout.items.map(i => i.value), levels.items.enum)
-      const simplify = processingConfigSchema.allOf[1].properties.simplifyLevel
-      assert.deepEqual(simplify.layout.items.map(i => i.value), simplify.enum)
-      assert.deepEqual(simplify.enum, Object.keys(SIMPLIFY_TOLERANCES))
+      const simplify = processingConfigSchema.allOf[0].properties.simplifyLevels
+      assert.deepEqual(simplify.layout.items.map(i => i.value), simplify.items.enum)
+      assert.deepEqual(simplify.items.enum, Object.keys(SIMPLIFY_TOLERANCES))
     })
 
     it('offers exactly the years that have a source', () => {

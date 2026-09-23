@@ -35,8 +35,7 @@ export const run: RunFunction<ProcessingConfig> = async (context) => {
   const years = [...(processingConfig.years ?? [YEARS[0]])].sort((a, b) => b - a)
   const requestedLevels = processingConfig.levels ?? ['region', 'departement', 'epci', 'commune']
   const levels = LEVEL_ORDER.filter(l => requestedLevels.includes(l))
-  const simplifyLevel = processingConfig.simplifyLevel ?? 'medium'
-  const simplifyTolerance = SIMPLIFY_TOLERANCES[simplifyLevel]
+  const simplifyLevels = processingConfig.simplifyLevels?.length ? processingConfig.simplifyLevels : ['medium' as const]
   const combineCommunesAndPlm = processingConfig.combineCommunesAndPlm !== false
   const enableVtPrepare = processingConfig.enableVtPrepare !== false
   const datasetIdPrefix = processingConfig.datasetIdPrefix || 'france-contours'
@@ -45,7 +44,7 @@ export const run: RunFunction<ProcessingConfig> = async (context) => {
   await log.step('Configuration')
   await log.info(`Millésimes : ${years.join(', ')}`)
   await log.info(`Niveaux : ${levels.join(', ')}`)
-  await log.info(`Simplification : ${simplifyLevel}${simplifyTolerance ? ` (${simplifyTolerance}°)` : ''}`)
+  await log.info(`Simplifications : ${simplifyLevels.join(', ')}`)
 
   try {
     const existingBySlug = skipUpload ? new Map() : await fetchExistingDatasetsBySlug(axios, log)
@@ -60,45 +59,58 @@ export const run: RunFunction<ProcessingConfig> = async (context) => {
         const mergeArm = level === 'commune' && combineCommunesAndPlm
         const armLayer = mergeArm ? getSourceForLevel(year, 'arrondissement-municipal').layer : null
         const downloadDir = path.join(tmpDir, 'downloads', String(year))
-        const paths: string[] = []
-        const armPaths: string[] = []
+        const extracted: { extractDir: string, format: typeof source.archives[number]['format'] }[] = []
         const chefLieuPaths: string[] = []
 
+        // Download and chef-lieu join once, whatever the number of simplifications
         for (const archive of source.archives) {
           const { extractDir } = await downloadArchive(archive.url, downloadDir, axios, log)
-          const outputDir = path.join(tmpDir, 'geojson', String(year), path.basename(extractDir))
-          const convert = (layer: string, optional = false, tolerance = simplifyTolerance) =>
-            convertLayer({ extractDir, format: archive.format, layer, outputDir, simplifyTolerance: tolerance, optional, log })
-
-          paths.push(...await convert(source.layer))
-          if (source.chefLieuLayer) chefLieuPaths.push(...await convert(source.chefLieuLayer, true, null))
-          if (armLayer) armPaths.push(...await convert(armLayer, true))
+          extracted.push({ extractDir, format: archive.format })
+          if (source.chefLieuLayer) {
+            const outputDir = path.join(tmpDir, 'geojson', String(year), 'chef-lieu', path.basename(extractDir))
+            chefLieuPaths.push(...await convertLayer({ extractDir, format: archive.format, layer: source.chefLieuLayer, outputDir, simplifyTolerance: null, optional: true, log }))
+          }
         }
         if (chefLieuPaths.length) await loadChefLieux(chefLieuPaths, memory)
-        if (mergeArm && armPaths.length === 0) await log.warning(`Arrondissements municipaux introuvables pour ${year}, les communes de Paris, Lyon et Marseille sont conservées telles quelles.`)
 
-        const slug = `${datasetIdPrefix}-${year}-${level}-${simplifyLevel}`
         const schema = getDatasetSchema(level, { year, enableVtPrepare, combineCommunesAndPlm })
-        const normalizedPath = path.join(tmpDir, 'normalized', `${slug}.geojson`)
-        await fs.ensureDir(path.dirname(normalizedPath))
-        const count = await normalizeGeojson(
-          { paths, armPaths },
-          normalizedPath,
-          level,
-          year,
-          memory,
-          // the standalone arrondissement-municipal level keeps its own shape whatever the PLM option
-          { combineCommunesAndPlm: mergeArm, keepPlmParents: armPaths.length === 0, schemaKeys: new Set(schema.map(p => p.key)) },
-          log
-        )
-        if (count === 0) throw new Error(`Aucune entité produite pour ${level} (${year})`)
+        const metadata = getDatasetMetadata(level, year, source, { combineCommunesAndPlm })
 
-        if (skipUpload) {
-          await log.info('Mode simulation actif : le jeu de données n\'est pas publié.')
-        } else {
-          const title = `Contours administratifs ${year} - ${levelTitle} (${simplifyLevel})`
-          const metadata = getDatasetMetadata(level, year, source, { combineCommunesAndPlm })
-          await uploadDataset({ slug, title, filePath: normalizedPath, schema, metadata }, existingBySlug, axios, log)
+        for (const simplifyLevel of simplifyLevels) {
+          const simplifyTolerance = SIMPLIFY_TOLERANCES[simplifyLevel]
+          await log.info(`Simplification ${simplifyLevel}${simplifyTolerance ? ` (${simplifyTolerance}°)` : ''}`)
+          const paths: string[] = []
+          const armPaths: string[] = []
+          for (const { extractDir, format } of extracted) {
+            const outputDir = path.join(tmpDir, 'geojson', String(year), simplifyLevel, path.basename(extractDir))
+            const convert = (layer: string, optional = false) =>
+              convertLayer({ extractDir, format, layer, outputDir, simplifyTolerance, optional, log })
+            paths.push(...await convert(source.layer))
+            if (armLayer) armPaths.push(...await convert(armLayer, true))
+          }
+          if (mergeArm && armPaths.length === 0) await log.warning(`Arrondissements municipaux introuvables pour ${year}, les communes de Paris, Lyon et Marseille sont conservées telles quelles.`)
+
+          const slug = `${datasetIdPrefix}-${year}-${level}-${simplifyLevel}`
+          const normalizedPath = path.join(tmpDir, 'normalized', `${slug}.geojson`)
+          await fs.ensureDir(path.dirname(normalizedPath))
+          const count = await normalizeGeojson(
+            { paths, armPaths },
+            normalizedPath,
+            level,
+            year,
+            memory,
+            // the standalone arrondissement-municipal level keeps its own shape whatever the PLM option
+            { combineCommunesAndPlm: mergeArm, keepPlmParents: armPaths.length === 0, schemaKeys: new Set(schema.map(p => p.key)) },
+            log
+          )
+          if (count === 0) throw new Error(`Aucune entité produite pour ${level} (${year}, ${simplifyLevel})`)
+
+          if (skipUpload) {
+            await log.info('Mode simulation actif : le jeu de données n\'est ni créé ni mis à jour.')
+          } else {
+            const title = `Contours administratifs ${year} - ${levelTitle} (${simplifyLevel})`
+            await uploadDataset({ slug, title, filePath: normalizedPath, schema, metadata }, existingBySlug, axios, log)
+          }
         }
       }
     }

@@ -19,11 +19,11 @@ Processing plugin for [data-fair/processings](https://github.com/data-fair/proce
 | --- | ----- | ----------- |
 | Périmètre | `years` | Millésimes to process (2017 to 2026, default 2026) |
 | Périmètre | `levels` | `region`, `departement`, `epci`, `commune`, `arrondissement-municipal`, `iris` |
+| Périmètre | `simplifyLevels` | One dataset per level: `full` (none), `precise` (0.0001°), `medium` (0.001°, default), `simple` (0.01°) |
 | Options | `datasetIdPrefix` | Slug prefix, default `france-contours` |
-| Options | `simplifyLevel` | `full` (none), `precise` (0.0001°), `medium` (0.001°, default), `simple` (0.01°) |
 | Options | `combineCommunesAndPlm` | Merge the arrondissements of Paris, Lyon and Marseille into the commune level (default on) |
 | Options | `enableVtPrepare` | Set `vtPrepare` on the geometry column (default on) |
-| Options | `skipUpload` | Download, convert and normalize without publishing anything |
+| Options | `skipUpload` | Dry run: download, convert and normalize without creating or updating any dataset |
 
 This plugin manages several datasets at once, which is why it has no standard "create / update a dataset" tab: the slug is the stable handle.
 
