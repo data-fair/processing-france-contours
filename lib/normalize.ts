@@ -1,6 +1,5 @@
 import fs from 'fs-extra'
 import path from 'node:path'
-import readline from 'node:readline'
 import type { ProcessingContext } from '@data-fair/lib-common-types/processings.js'
 import type { ProcessingConfig } from '#types/processingConfig/index.ts'
 import type { AdministrativeLevel } from './sources.ts'
@@ -128,16 +127,60 @@ const communeEpci = (props: Props): string => {
 }
 
 /**
+ * GDAL writes one feature per line with the geometry as its last member. Only the head of the
+ * line is parsed: the geometry is kept as raw text and written back as is, so that an
+ * unsimplified region (a single line of ~30 MB) is never turned into millions of JS arrays.
+ * Returns null when the line does not have that shape.
+ */
+const parseFeatureLine = (text: string): any | null => {
+  const idx = text.lastIndexOf('"geometry":')
+  if (idx === -1 || !text.startsWith('{') || !text.endsWith('}')) return null
+  const head = text.slice(0, idx).trimEnd()
+  const rawGeometry = text.slice(idx + '"geometry":'.length, -1).trim()
+  if (!head.endsWith(',') || !(rawGeometry === 'null' || (rawGeometry.startsWith('{') && rawGeometry.endsWith('}')))) return null
+  try {
+    const feature = JSON.parse(head.slice(0, -1) + '}')
+    feature.rawGeometry = rawGeometry
+    return feature
+  } catch {
+    return null
+  }
+}
+
+/** Serializes a normalized feature, splicing its raw geometry text back when it has one */
+export const serializeFeature = ({ rawGeometry, geometry, ...rest }: any): string =>
+  `${JSON.stringify(rest).slice(0, -1)},"geometry":${rawGeometry ?? JSON.stringify(geometry ?? null)}}`
+
+/**
  * Streams the features of a GeoJSON file one by one. GDAL writes one feature per line, which is
  * what this relies on (with a buffered fallback for multi-line features).
  */
+/**
+ * Lines of a file, read chunk by chunk: unlike the readline async iterator, which keeps reading
+ * and queuing lines while the consumer awaits its writes, the next chunk is only read once the
+ * lines of the previous one have been consumed.
+ */
+async function * readLines (fileStream: fs.ReadStream): AsyncGenerator<string> {
+  let rest = ''
+  for await (const chunk of fileStream as AsyncIterable<string>) {
+    // a long line (an unsimplified region) spans many chunks: append without splitting
+    if (!chunk.includes('\n')) {
+      rest += chunk
+      continue
+    }
+    const lines = (rest + chunk).split('\n')
+    rest = lines.pop() ?? ''
+    for (const line of lines) yield line.endsWith('\r') ? line.slice(0, -1) : line
+  }
+  if (rest) yield rest
+}
+
 export async function * parseGeojsonFeatures (filePath: string): AsyncGenerator<any> {
-  const fileStream = fs.createReadStream(filePath, { encoding: 'utf8' })
-  const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity })
+  const fileStream = fs.createReadStream(filePath, { encoding: 'utf8', highWaterMark: 1024 * 1024 })
   let buffer = ''
   let inFeatures = false
   try {
-    for await (const line of rl) {
+    for await (const line of readLines(fileStream)) {
       assertNotStopped()
       const trimmed = line.trim()
       if (!inFeatures) {
@@ -146,6 +189,13 @@ export async function * parseGeojsonFeatures (filePath: string): AsyncGenerator<
       }
       if (trimmed === ']' || trimmed === ']}' || trimmed === '}') break
       if (!trimmed) continue
+      if (!buffer) {
+        const feature = parseFeatureLine(trimmed.endsWith(',') ? trimmed.slice(0, -1) : trimmed)
+        if (feature) {
+          yield feature
+          continue
+        }
+      }
       buffer += line
       const candidate = buffer.trim().replace(/,$/, '')
       if (candidate.startsWith('{') && candidate.endsWith('}')) {
@@ -159,7 +209,6 @@ export async function * parseGeojsonFeatures (filePath: string): AsyncGenerator<
       }
     }
   } finally {
-    rl.close()
     fileStream.destroy()
   }
 }
@@ -192,7 +241,7 @@ export const normalizeFeature = (
   const raw: Props = feature.properties ?? {}
   const props = lowerProps(raw)
   const withPopulation = options.schemaKeys ? options.schemaKeys.has('POPULATION') : population(props) !== null
-  const build = (id: string, properties: Props) => ({ id, type: 'Feature', geometry: feature.geometry, properties })
+  const build = (id: string, properties: Props) => ({ id, type: 'Feature', geometry: feature.geometry, rawGeometry: feature.rawGeometry, properties })
 
   switch (level) {
     // Years are processed from the most recent one: region and departement labels seen first
@@ -387,7 +436,7 @@ export const normalizeGeojson = async (
   })
   const writeFeature = async (feature: any) => {
     validateProperties(feature, options.schemaKeys)
-    await write(`${count === 0 ? '' : ',\n'}${JSON.stringify(feature)}`)
+    await write(`${count === 0 ? '' : ',\n'}${serializeFeature(feature)}`)
     count++
     if (count % 5000 === 0) log.progress(task, count, 0).catch(() => {})
   }
