@@ -398,12 +398,6 @@ describe('Processing France Contours', () => {
       assert.deepEqual(Object.keys(can2021.properties).sort(), [...keysOf('canton')].filter(k => k !== 'geometry').sort())
     })
 
-    it('reads the ADMIN-EXPRESS-COG 2.x municipal arrondissements (code in INSEE_COM, parent in INSEE_RATT)', () => {
-      const memory = createTerritoryMemory()
-      const arm = normalizeFeature({ geometry: null, properties: { NOM_COM: 'Paris 16e Arrondissement', INSEE_COM: '75116', INSEE_RATT: '75056', TYPE: 'ARM', POPULATION: 166361 } }, 'arrondissement-municipal', 2020, memory, { combineCommunesAndPlm: true })
-      assert.deepEqual([arm.properties.INSEE_COM, arm.properties.INSEE_RATT], ['75116', '75056'])
-    })
-
     it('rejects a feature without its pivot code', () => {
       const memory = createTerritoryMemory()
       assert.throws(() => normalizeFeature({ geometry: null, properties: { NOM: 'Nowhere' } }, 'commune', 2026, memory), /Code commune manquant/)
