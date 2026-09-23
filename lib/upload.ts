@@ -54,20 +54,19 @@ export interface DatasetUpload {
 }
 
 /**
- * Creates or updates (by slug) a dataset from a GeoJSON file. The processing owns these datasets:
- * title, schema annotations and metadata are re-applied at every run.
+ * Creates (with the given slug) or updates a dataset from a GeoJSON file. The processing owns
+ * these datasets: title, schema annotations and metadata are re-applied at every run.
  */
 export const uploadDataset = async (
   { slug, title, filePath, schema, metadata }: DatasetUpload,
-  existingBySlug: Map<string, ExistingDataset>,
+  existing: { id: string } | undefined,
   axios: AxiosInstance,
   log: Log
-): Promise<void> => {
+): Promise<{ id: string, title: string }> => {
   assertNotStopped()
-  const existing = existingBySlug.get(slug)
   const actionLabel = existing ? 'Mise à jour' : 'Création'
   const stats = await fs.stat(filePath)
-  await log.info(`${actionLabel} du jeu de données "${title}" (slug : ${slug}, ${formatBytes(stats.size)})...`)
+  await log.info(`${actionLabel} du jeu de données "${title}" (${formatBytes(stats.size)})...`)
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     assertNotStopped()
@@ -95,14 +94,14 @@ export const uploadDataset = async (
 
       const dataset = response.data
       await log.info(`${actionLabel} réussie : ${dataset.title ?? title} (id : ${dataset.id}, slug : ${dataset.slug ?? slug})`)
-      if (!existing && dataset.slug) existingBySlug.set(dataset.slug, { id: dataset.id, slug: dataset.slug, title: dataset.title ?? title })
-      return
+      return { id: dataset.id, title: dataset.title ?? title }
     } catch (err: any) {
       if (isStopped()) throw new StopError()
       const message = err.response?.data?.message ?? err.response?.data ?? err.message
-      if (attempt === MAX_ATTEMPTS) throw new Error(`Échec du téléversement de ${slug} après ${MAX_ATTEMPTS} tentatives : ${message}`)
-      await log.warning(`Échec du téléversement (${attempt}/${MAX_ATTEMPTS}) pour ${slug} : ${message}. Nouvel essai dans 10s...`)
+      if (attempt === MAX_ATTEMPTS) throw new Error(`Échec du téléversement de ${title} après ${MAX_ATTEMPTS} tentatives : ${message}`)
+      await log.warning(`Échec du téléversement (${attempt}/${MAX_ATTEMPTS}) pour ${title} : ${message}. Nouvel essai dans 10s...`)
       await sleep(10000)
     }
   }
+  throw new Error('unreachable')
 }

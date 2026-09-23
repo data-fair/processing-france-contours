@@ -17,7 +17,7 @@ const PROGRESS_STEP = 20 * 1024 * 1024
 // The Géoplateforme answers 403 to the default "axios/x.y.z" user agent
 const USER_AGENT = 'data-fair-processing-france-contours'
 
-const downloadFile = async (url: string, filePath: string, axios: AxiosInstance, log: Log): Promise<void> => {
+export const downloadFile = async (url: string, filePath: string, axios: AxiosInstance, log: Log): Promise<void> => {
   const fileName = path.basename(filePath)
   const tmpFile = `${filePath}.tmp`
   const task = `Téléchargement de ${fileName}`
@@ -25,9 +25,16 @@ const downloadFile = async (url: string, filePath: string, axios: AxiosInstance,
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     assertNotStopped()
     try {
-      const response = await axios({ url, method: 'GET', responseType: 'stream', timeout: 600000, headers: { 'User-Agent': USER_AGENT } })
-      const total = Number(response.headers['content-length']) || 0
-      let downloaded = 0
+      // The Géoplateforme often cuts large transfers: resume from the bytes already received
+      const received = (await fs.pathExists(tmpFile)) ? (await fs.stat(tmpFile)).size : 0
+      const headers: Record<string, string> = { 'User-Agent': USER_AGENT }
+      if (received) headers.Range = `bytes=${received}-`
+      const response = await axios({ url, method: 'GET', responseType: 'stream', timeout: 600000, headers })
+      // a 200 to a range request means the server sends the whole file again
+      const resumed = received > 0 && response.status === 206
+      if (resumed) await log.info(`Reprise du téléchargement à ${formatBytes(received)}.`)
+      let downloaded = resumed ? received : 0
+      const total = downloaded + (Number(response.headers['content-length']) || 0)
       let lastReported = 0
       await log.task(task)
       const progress = new Transform({
@@ -41,14 +48,15 @@ const downloadFile = async (url: string, filePath: string, axios: AxiosInstance,
           callback(null, chunk)
         }
       })
-      await pipeline(response.data, progress, fs.createWriteStream(tmpFile))
+      await pipeline(response.data, progress, fs.createWriteStream(tmpFile, { flags: resumed ? 'a' : 'w' }))
       await log.progress(task, downloaded, total || downloaded)
       await fs.move(tmpFile, filePath, { overwrite: true })
       await log.info(`Téléchargement terminé : ${fileName} (${formatBytes(downloaded)})`)
       return
     } catch (err: any) {
-      await fs.remove(tmpFile).catch(() => {})
       if (isStopped()) throw new StopError()
+      // range beyond the end: the partial file is unusable, start over
+      if (err.response?.status === 416) await fs.remove(tmpFile)
       if (attempt === MAX_ATTEMPTS) throw new Error(`Impossible de télécharger ${url} après ${MAX_ATTEMPTS} tentatives : ${err.message}`)
       await log.warning(`Échec du téléchargement (${attempt}/${MAX_ATTEMPTS}) : ${err.message}. Nouvel essai dans 5s...`)
       await sleep(5000)

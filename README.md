@@ -1,31 +1,33 @@
 # @data-fair/processing-france-contours
 
-Processing plugin for [data-fair/processings](https://github.com/data-fair/processings) that publishes and keeps up to date the official French administrative boundaries (IGN ADMIN-EXPRESS-COG and CONTOURS-IRIS), one dataset per millésime and per administrative level.
+Processing plugin for [data-fair/processings](https://github.com/data-fair/processings) that publishes and keeps up to date the official French administrative boundaries (IGN ADMIN-EXPRESS-COG and CONTOURS-IRIS), one dataset per administrative level and geometric simplification.
 
 ## Features
 
 - **IGN Géoplateforme sources, 2017 to 2026** — every delivery format the IGN used over the period is handled: Shapefile (2017-2024, including the per-territory Lambert-93 / UTM deliveries of 2017-2018), GeoPackage (ADMIN-EXPRESS-COG 4.0 from 2025, CONTOURS-IRIS from 2024), and the renamed attributes of ADMIN-EXPRESS-COG 4.0 (`code_insee`, `nom_officiel`, `codes_siren_des_epci`, chef-lieu point layers...).
 - **Communes and municipal arrondissements merged (PLM)** — the polygons of Paris, Lyon and Marseille are replaced by their 45 arrondissements in the commune level, giving a seamless partition without overlaps. The parent commune is kept in `INSEE_RATT`. When a delivery has no arrondissement layer (2017), the three communes are kept as is.
-- **Territory enrichment** — levels are processed from region down to commune, and each feature is completed with the labels and codes of its region, département and EPCI. Millésimes are processed from the most recent one so that older deliveries (uppercase names, missing chef-lieu) inherit the most complete labels.
+- **Territory enrichment** — levels are processed from region down to commune, and each feature is completed with the labels and codes of its region, département and EPCI.
 - **Strictly typed identifiers** — `INSEE_COM`, `INSEE_DEP`, `INSEE_REG`, `CODE_EPCI`, `CODE_IRIS`... are strings (leading zeros and Corsica `2A`/`2B` preserved), annotated with their INSEE concepts (`x-refersTo`). Every produced feature is validated against the dataset schema before publication.
 - **Geometry simplification** — reprojection to WGS84 first, then simplification with a tolerance in degrees, so that the same setting gives the same result on Lambert-93 and WGS84 deliveries.
 - **Pre-computed vector tiles** — the `vtPrepare` capability is set on the geometry column so that data-fair generates the vector tiles at indexing time.
-- **Idempotent publication** — datasets are looked up by slug in the owner's account (`<prefix>-<year>-<level>-<simplification>`) and updated in place; a dataset is only created when its slug does not exist yet.
+- **Create then update** — the create mode gives each dataset a consistent slug (`<prefix>-<year>-<level>-<simplification>`), reuses a dataset of the account that already has it (e.g. after an interrupted run), then switches the configuration to the update mode with one row per created dataset.
+- **Resumable downloads** — the Géoplateforme often cuts the transfer of the large archives; an interrupted download resumes from the received bytes with a range request.
 - **Graceful stop** — external commands (7-Zip, ogr2ogr) and the extraction worker are killed when the run is interrupted, and nothing is published.
 
 ## Configuration
 
 | Tab | Field | Description |
 | --- | ----- | ----------- |
-| Périmètre | `years` | Millésimes to process (2017 to 2026, default 2026) |
-| Périmètre | `levels` | `region`, `departement`, `epci`, `commune`, `arrondissement-municipal`, `iris` |
-| Périmètre | `simplifyLevels` | One dataset per level: `full` (none), `precise` (0.0001°), `medium` (0.001°, default), `simple` (0.01°) |
-| Options | `datasetIdPrefix` | Slug prefix, default `france-contours` |
-| Options | `combineCommunesAndPlm` | Merge the arrondissements of Paris, Lyon and Marseille into the commune level (default on) |
-| Options | `enableVtPrepare` | Set `vtPrepare` on the geometry column (default on) |
-| Options | `skipUpload` | Dry run: download, convert and normalize without creating or updating any dataset |
+| Jeux de données | `datasetMode` | `create` or `update` |
+| Jeux de données | `datasets` | One row per dataset: `level` (`region`, `departement`, `epci`, `commune`, `arrondissement-municipal`, `iris`), `simplifyLevel` (`full`, `precise` 0.0001°, `medium` 0.001°, `simple` 0.01°) and, in update mode, the target `dataset` |
+| Jeux de données | `createAll` | Create mode only: every level in every simplification (24 datasets), for an initial load |
+| Jeux de données | `datasetIdPrefix` | Create mode only: slug prefix, default `france-contours` |
+| Paramètres | `year` | Millésime (2017 to 2026, default 2026) |
+| Paramètres | `combineCommunesAndPlm` | Merge the arrondissements of Paris, Lyon and Marseille into the commune level (default on) |
+| Paramètres | `enableVtPrepare` | Set `vtPrepare` on the geometry column (default on) |
+| Paramètres | `skipUpload` | Dry run: download, convert and normalize without creating or updating any dataset |
 
-This plugin manages several datasets at once, which is why it has no standard "create / update a dataset" tab: the slug is the stable handle.
+A row can repeat a level with another simplification, e.g. a precise commune dataset for analysis and a light one for small-scale maps. Archives are downloaded once per run whatever the number of rows.
 
 ## Produced datasets
 

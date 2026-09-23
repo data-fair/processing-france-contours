@@ -3,6 +3,8 @@ import { after, before, beforeEach, describe, it } from 'node:test'
 import fs from 'fs-extra'
 import os from 'node:os'
 import path from 'node:path'
+import http from 'node:http'
+import axiosLib from 'axios'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import * as plugin from '../index.ts'
@@ -12,6 +14,8 @@ import { getDatasetSchema } from '../lib/schemas.ts'
 import { getDatasetMetadata } from '../lib/metadata.ts'
 import { createTerritoryMemory, formatInseeCode, loadChefLieux, normalizeFeature, normalizeGeojson, parseGeojsonFeatures } from '../lib/normalize.ts'
 import { convertLayer } from '../lib/convert.ts'
+import { downloadFile } from '../lib/download.ts'
+import { getTargets } from '../lib/execute.ts'
 import { extract7z } from '../lib/extract.ts'
 import { runCommand } from '../lib/exec.ts'
 import { StopError, isStopped, resetStopState } from '../lib/state.ts'
@@ -65,16 +69,55 @@ describe('Processing France Contours', () => {
     })
 
     it('labels the technical enum values', () => {
-      const levels = processingConfigSchema.allOf[0].properties.levels
-      assert.deepEqual(levels.layout.items.map(i => i.value), levels.items.enum)
-      const simplify = processingConfigSchema.allOf[0].properties.simplifyLevels
-      assert.deepEqual(simplify.layout.items.map(i => i.value), simplify.items.enum)
-      assert.deepEqual(simplify.items.enum, Object.keys(SIMPLIFY_TOLERANCES))
+      const defs = processingConfigSchema.$defs
+      assert.deepEqual(defs.level.oneOf.map(i => i.const), ['region', 'departement', 'epci', 'commune', 'arrondissement-municipal', 'iris'])
+      assert.deepEqual(defs.simplifyLevel.oneOf.map(i => i.const), Object.keys(SIMPLIFY_TOLERANCES))
     })
 
     it('offers exactly the years that have a source', () => {
-      assert.deepEqual(processingConfigSchema.allOf[0].properties.years.items.enum, YEARS)
+      assert.deepEqual(processingConfigSchema.allOf[1].properties.year.enum, YEARS)
       assert.deepEqual(Object.keys(IRIS_ARCHIVES).map(Number).sort(), Object.keys(ADMIN_EXPRESS_ARCHIVES).map(Number).sort())
+    })
+
+    it('expands "create all" and orders the rows from region down, without duplicates', () => {
+      assert.equal(getTargets({ datasetMode: 'create', createAll: true } as any).length, 24)
+      const rows = [
+        { level: 'iris', simplifyLevel: 'simple' },
+        { level: 'commune', simplifyLevel: 'precise' },
+        { level: 'region', simplifyLevel: 'medium' },
+        { level: 'commune', simplifyLevel: 'simple' },
+        { level: 'commune', simplifyLevel: 'precise' }
+      ]
+      assert.deepEqual(getTargets({ datasetMode: 'update', datasets: rows } as any).map(t => `${t.level}-${t.simplifyLevel}`),
+        ['region-medium', 'commune-precise', 'commune-simple', 'iris-simple'])
+    })
+  })
+
+  describe('download', () => {
+    it('resumes an interrupted transfer with a range request', async () => {
+      const body = Buffer.alloc(200000, 'x')
+      const ranges: (string | undefined)[] = []
+      const server = http.createServer((req, res) => {
+        ranges.push(req.headers.range)
+        const start = Number(req.headers.range?.match(/bytes=(\d+)-/)?.[1] ?? 0)
+        if (start) {
+          res.writeHead(206, { 'content-length': body.length - start })
+          return res.end(body.subarray(start))
+        }
+        // first attempt: the connection is cut halfway, like the Géoplateforme does
+        res.writeHead(200, { 'content-length': body.length })
+        res.write(body.subarray(0, 100000), () => setTimeout(() => res.destroy(), 50))
+      })
+      await new Promise<void>(resolve => server.listen(0, resolve))
+      try {
+        const url = `http://localhost:${(server.address() as any).port}/archive.7z`
+        const filePath = path.join(tmpDir, 'archive.7z')
+        await downloadFile(url, filePath, axiosLib.create(), log)
+        assert.deepEqual(ranges, [undefined, 'bytes=100000-'])
+        assert.ok((await fs.readFile(filePath)).equals(body))
+      } finally {
+        server.close()
+      }
     })
   })
 
@@ -368,7 +411,7 @@ describe('Processing France Contours', () => {
     beforeEach(() => { resetStopState() })
 
     it('prepare returns the config untouched (no secret)', async () => {
-      const config = { years: [2026], levels: ['commune'] } as any
+      const config = { datasetMode: 'create', year: 2026, datasets: [{ level: 'commune', simplifyLevel: 'medium' }] } as any
       const res = await plugin.prepare({ processingConfig: config, secrets: {} })
       assert.deepEqual(res.processingConfig, config)
     })
