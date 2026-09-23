@@ -20,6 +20,7 @@ export interface ExistingDataset {
 }
 
 const MAX_ATTEMPTS = 3
+const PROGRESS_STEP = 10 * 1024 * 1024
 
 /**
  * Indexes the datasets of the processing owner by slug. A dataset id cannot be chosen at creation
@@ -76,6 +77,8 @@ export const uploadDataset = async (
   assertNotStopped()
   const actionLabel = existing ? 'Mise à jour' : 'Création'
   const stats = await fs.stat(filePath)
+  const task = `Téléversement de « ${title} »`
+  await log.task(task)
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     assertNotStopped()
@@ -90,6 +93,7 @@ export const uploadDataset = async (
       }
       formData.append('file', fs.createReadStream(filePath), { filename: path.basename(filePath) })
       const contentLength = await promisify(formData.getLength.bind(formData))()
+      let lastReported = 0
 
       const response = await axios({
         method: 'post',
@@ -98,8 +102,14 @@ export const uploadDataset = async (
         maxContentLength: Infinity,
         maxBodyLength: Infinity,
         headers: { ...formData.getHeaders(), 'content-length': String(contentLength) },
-        timeout: 1800000 // 30 minutes, the largest layers weigh several hundred MB
+        timeout: 1800000, // 30 minutes, the largest layers weigh several hundred MB
+        onUploadProgress: ({ loaded }) => {
+          if (loaded - lastReported < PROGRESS_STEP) return
+          lastReported = loaded
+          log.progress(task, loaded, contentLength).catch(() => {})
+        }
       })
+      await log.progress(task, contentLength, contentLength)
 
       const dataset = response.data
       await log.info(`${actionLabel} de « ${dataset.title ?? title} » (${count} entités, ${formatBytes(stats.size)}, id ${dataset.id}, slug ${dataset.slug ?? slug})`)

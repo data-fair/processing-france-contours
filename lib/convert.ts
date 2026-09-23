@@ -99,13 +99,17 @@ export const convertLayer = async (options: ConvertOptions): Promise<string[]> =
     throw new Error(`Couche ${layer} introuvable dans ${extractDir}`)
   }
 
-  const convertedPaths: string[] = []
-  for (const job of jobs) {
-    assertNotStopped()
-    const outputPath = path.join(outputDir, job.output)
-    // silent: one line per converted layer would flood the run log of a multi-year run
-    if (!await fs.pathExists(outputPath)) await ogr2geojson(job.input, job.layer, outputPath, simplifyTolerance)
-    convertedPaths.push(outputPath)
+  const outputPaths = jobs.map(job => path.join(outputDir, job.output))
+  const todo = jobs.filter((_job, i) => !fs.pathExistsSync(outputPaths[i]))
+  if (todo.length) {
+    // task names must be unique in the run: the archive and the tolerance tell the conversions apart
+    const task = `Conversion de la couche ${layer} de ${path.basename(extractDir)} (${simplifyTolerance === null ? 'sans simplification' : `tolérance ${simplifyTolerance}°`})`
+    await log.task(task)
+    for (const [i, job] of todo.entries()) {
+      assertNotStopped()
+      await ogr2geojson(job.input, job.layer, path.join(outputDir, job.output), simplifyTolerance)
+      await log.progress(task, i + 1, todo.length)
+    }
   }
-  return convertedPaths
+  return outputPaths
 }

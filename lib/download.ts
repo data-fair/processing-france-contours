@@ -23,6 +23,8 @@ export const downloadFile = async (url: string, filePath: string, axios: AxiosIn
   const tmpFile = `${filePath}.tmp`
   const task = `Téléchargement de ${fileName}`
   const receivedSize = async () => (await fs.pathExists(tmpFile)) ? (await fs.stat(tmpFile)).size : 0
+  // one task for every attempt: the progress of a task is attached to the first one bearing its name
+  await log.task(task)
 
   for (let failures = 0; ;) {
     assertNotStopped()
@@ -37,7 +39,6 @@ export const downloadFile = async (url: string, filePath: string, axios: AxiosIn
       let downloaded = resumed ? received : 0
       const total = downloaded + (Number(response.headers['content-length']) || 0)
       let lastReported = 0
-      await log.task(task)
       const progress = new Transform({
         transform (chunk, _encoding, callback) {
           downloaded += chunk.length
@@ -90,10 +91,13 @@ export const downloadArchive = async (
   if (!await fs.pathExists(extractDir)) {
     assertNotStopped()
     const tmpDir = `${extractDir}.tmp`
+    const task = `Extraction de ${fileName}`
+    await log.task(task)
     await fs.emptyDir(tmpDir)
     try {
       const extractor = await extract7z(archivePath, tmpDir)
       await fs.move(tmpDir, extractDir)
+      await log.progress(task, 1, 1)
       await log.info(`Archive ${fileName} extraite (${extractor === 'wasm' ? '7z-wasm' : '7z natif'}).`)
     } catch (err: any) {
       await fs.remove(tmpDir).catch(() => {})

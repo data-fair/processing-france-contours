@@ -16,7 +16,7 @@ import { createTerritoryMemory, departementalCode, formatInseeCode, loadChefLieu
 import { convertLayer } from '../lib/convert.ts'
 import { downloadFile } from '../lib/download.ts'
 import { LEVEL_ORDER, getTargets } from '../lib/execute.ts'
-import { toDataFairSchema } from '../lib/upload.ts'
+import { toDataFairSchema, uploadDataset } from '../lib/upload.ts'
 import { extract7z } from '../lib/extract.ts'
 import { runCommand } from '../lib/exec.ts'
 import { StopError, isStopped, resetStopState } from '../lib/state.ts'
@@ -98,6 +98,34 @@ describe('Processing France Contours', () => {
   })
 
   describe('download', () => {
+    it('uploads a dataset with lowercase schema keys and reports the upload progress', async () => {
+      const filePath = path.join(tmpDir, 'upload.geojson')
+      await fs.writeFile(filePath, JSON.stringify({ type: 'FeatureCollection', features: [] }) + ' '.repeat(12 * 1024 * 1024))
+      let body = ''
+      const server = http.createServer((req, res) => {
+        req.setEncoding('latin1')
+        req.on('data', chunk => { if (body.length < 100000) body += chunk })
+        req.on('end', () => { res.writeHead(201, { 'content-type': 'application/json' }); res.end(JSON.stringify({ id: 'abc', slug: 'france-contours-2026-region-medium', title: 'T' })) })
+      })
+      await new Promise<void>(resolve => server.listen(0, resolve))
+      const progress: [string, number, number][] = []
+      const tasks: string[] = []
+      const uploadLog = { ...log, task: async (m: string) => { tasks.push(m) }, progress: async (m: string, p: number, t: number) => { progress.push([m, p, t]) } }
+      try {
+        const axiosInstance = axiosLib.create({ baseURL: `http://localhost:${(server.address() as any).port}/` })
+        const schema = getDatasetSchema('region', { year: 2026 })
+        const res = await uploadDataset({ slug: 'france-contours-2026-region-medium', title: 'T', filePath, schema, metadata: {} as any, count: 0 }, undefined, axiosInstance, uploadLog)
+        assert.equal(res.id, 'abc')
+        assert.ok(body.includes('"key":"insee_reg"'), 'schema keys are lowercased')
+        assert.deepEqual(tasks, ['Téléversement de « T »'])
+        const last = progress.at(-1)!
+        assert.ok(progress.length >= 2, 'intermediate progress on a large file')
+        assert.equal(last[1], last[2])
+      } finally {
+        server.close()
+      }
+    })
+
     it('resumes an interrupted transfer with a range request', async () => {
       const body = Buffer.alloc(200000, 'x')
       const ranges: (string | undefined)[] = []

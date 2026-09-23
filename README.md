@@ -12,7 +12,7 @@ Processing plugin for [data-fair/processings](https://github.com/data-fair/proce
 - **Geometry simplification** — reprojection to WGS84 first, then simplification with a tolerance in degrees, so that the same setting gives the same result on Lambert-93 and WGS84 deliveries.
 - **Pre-computed vector tiles** — the `vtPrepare` capability is set on the geometry column so that data-fair generates the vector tiles at indexing time.
 - **Create then update** — the create mode gives each dataset a consistent slug (`<prefix>-<year>-<level>-<simplification>`), reuses a dataset of the account that already has it (e.g. after an interrupted run), then switches the configuration to the update mode with one row per created dataset.
-- **Compact run log and disk usage** — one log line per archive and per dataset, and the files of a millésime are deleted before the next one.
+- **Compact run log and disk usage** — download, extraction, conversion, normalization and upload are progress tasks updated in place, with one summary line per archive and per dataset; the files of a millésime are deleted before the next one.
 - **Resumable downloads** — the Géoplateforme often cuts the transfer of the large archives; an interrupted download resumes from the received bytes with a range request.
 - **Graceful stop** — external commands (7-Zip, ogr2ogr) and the extraction worker are killed when the run is interrupted, and nothing is published.
 

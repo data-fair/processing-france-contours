@@ -1,4 +1,5 @@
 import fs from 'fs-extra'
+import path from 'node:path'
 import readline from 'node:readline'
 import type { ProcessingContext } from '@data-fair/lib-common-types/processings.js'
 import type { ProcessingConfig } from '#types/processingConfig/index.ts'
@@ -375,6 +376,8 @@ export const normalizeGeojson = async (
   options: NormalizeOptions & { schemaKeys: Set<string> },
   log: Log
 ): Promise<number> => {
+  const task = `Normalisation de ${path.basename(outputPath, '.geojson')}`
+  await log.task(task)
   const tmpOutputPath = `${outputPath}.tmp`
   const writeStream = fs.createWriteStream(tmpOutputPath, { encoding: 'utf8' })
   let count = 0
@@ -386,6 +389,7 @@ export const normalizeGeojson = async (
     validateProperties(feature, options.schemaKeys)
     await write(`${count === 0 ? '' : ',\n'}${JSON.stringify(feature)}`)
     count++
+    if (count % 5000 === 0) log.progress(task, count, 0).catch(() => {})
   }
 
   try {
@@ -407,6 +411,7 @@ export const normalizeGeojson = async (
     await write('\n]}\n')
     await new Promise<void>((resolve, reject) => writeStream.end((err?: Error) => err ? reject(err) : resolve()))
     await fs.move(tmpOutputPath, outputPath, { overwrite: true })
+    await log.progress(task, count, count)
   } catch (err) {
     writeStream.destroy()
     await fs.remove(tmpOutputPath).catch(() => {})
