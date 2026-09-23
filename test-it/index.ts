@@ -9,13 +9,14 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import * as plugin from '../index.ts'
 import processingConfigSchema from '../processing-config-schema.json' with { type: 'json' }
-import { ADMIN_EXPRESS_ARCHIVES, IRIS_ARCHIVES, SIMPLIFY_TOLERANCES, YEARS, getSourceForLevel } from '../lib/sources.ts'
+import { ADMIN_EXPRESS_ARCHIVES, IRIS_ARCHIVES, SIMPLIFY_TOLERANCES, YEARS, getSourceForLevel, isLevelAvailable } from '../lib/sources.ts'
 import { getDatasetSchema } from '../lib/schemas.ts'
 import { getDatasetMetadata } from '../lib/metadata.ts'
-import { createTerritoryMemory, formatInseeCode, loadChefLieux, normalizeFeature, normalizeGeojson, parseGeojsonFeatures } from '../lib/normalize.ts'
+import { createTerritoryMemory, departementalCode, formatInseeCode, loadChefLieux, normalizeFeature, normalizeGeojson, parseGeojsonFeatures } from '../lib/normalize.ts'
 import { convertLayer } from '../lib/convert.ts'
 import { downloadFile } from '../lib/download.ts'
-import { getTargets } from '../lib/execute.ts'
+import { LEVEL_ORDER, getTargets } from '../lib/execute.ts'
+import { toDataFairSchema } from '../lib/upload.ts'
 import { extract7z } from '../lib/extract.ts'
 import { runCommand } from '../lib/exec.ts'
 import { StopError, isStopped, resetStopState } from '../lib/state.ts'
@@ -70,26 +71,29 @@ describe('Processing France Contours', () => {
 
     it('labels the technical enum values', () => {
       const defs = processingConfigSchema.$defs
-      assert.deepEqual(defs.level.oneOf.map(i => i.const), ['region', 'departement', 'epci', 'commune', 'arrondissement-municipal', 'iris'])
+      assert.deepEqual(defs.level.oneOf.map(i => i.const), LEVEL_ORDER)
       assert.deepEqual(defs.simplifyLevel.oneOf.map(i => i.const), Object.keys(SIMPLIFY_TOLERANCES))
     })
 
     it('offers exactly the years that have a source', () => {
-      assert.deepEqual(processingConfigSchema.allOf[1].properties.year.enum, YEARS)
+      assert.deepEqual(processingConfigSchema.$defs.year.enum, YEARS)
       assert.deepEqual(Object.keys(IRIS_ARCHIVES).map(Number).sort(), Object.keys(ADMIN_EXPRESS_ARCHIVES).map(Number).sort())
     })
 
-    it('expands "create all" and orders the rows from region down, without duplicates', () => {
-      assert.equal(getTargets({ datasetMode: 'create', createAll: true } as any).length, 24)
+    it('crosses the millésimes with the rows, most recent first and from region down, without duplicates', () => {
+      assert.equal(getTargets({ datasetMode: 'create', createAll: true, years: [2026, 2025] } as any).length, 2 * 8 * 3)
       const rows = [
         { level: 'iris', simplifyLevel: 'simple' },
-        { level: 'commune', simplifyLevel: 'precise' },
+        { level: 'commune', simplifyLevel: 'full' },
         { level: 'region', simplifyLevel: 'medium' },
-        { level: 'commune', simplifyLevel: 'simple' },
-        { level: 'commune', simplifyLevel: 'precise' }
+        { level: 'commune', simplifyLevel: 'full' }
       ]
-      assert.deepEqual(getTargets({ datasetMode: 'update', datasets: rows } as any).map(t => `${t.level}-${t.simplifyLevel}`),
-        ['region-medium', 'commune-precise', 'commune-simple', 'iris-simple'])
+      assert.deepEqual(getTargets({ datasetMode: 'create', years: [2019, 2026], datasets: rows } as any).map(t => `${t.year}-${t.level}-${t.simplifyLevel}`), [
+        '2026-region-medium', '2026-commune-full', '2026-iris-simple',
+        '2019-region-medium', '2019-commune-full', '2019-iris-simple'
+      ])
+      const updateRows = [{ year: 2024, level: 'canton', simplifyLevel: 'medium', dataset: { id: 'a' } }, { year: 2025, level: 'region', simplifyLevel: 'medium', dataset: { id: 'b' } }]
+      assert.deepEqual(getTargets({ datasetMode: 'update', datasets: updateRows } as any).map(t => t.dataset?.id), ['b', 'a'])
     })
   })
 
@@ -122,6 +126,17 @@ describe('Processing France Contours', () => {
   })
 
   describe('IGN sources', () => {
+    it('names the arrondissement layer per edition and has no canton nor municipal arrondissement before 2020', () => {
+      assert.equal(getSourceForLevel(2019, 'arrondissement').layer, 'ARRONDISSEMENT_DEPARTEMENTAL')
+      assert.equal(getSourceForLevel(2020, 'arrondissement').layer, 'ARRONDISSEMENT_DEPARTEMENTAL')
+      assert.equal(getSourceForLevel(2021, 'arrondissement').layer, 'ARRONDISSEMENT')
+      assert.equal(getSourceForLevel(2020, 'canton').layer, 'CANTON')
+      assert.equal(isLevelAvailable(2019, 'canton'), false)
+      assert.equal(isLevelAvailable(2019, 'arrondissement-municipal'), false)
+      assert.equal(isLevelAvailable(2019, 'commune'), true)
+      assert.throws(() => getSourceForLevel(2019, 'canton'), /No canton layer/)
+    })
+
     it('serves ADMIN-EXPRESS-COG from the Géoplateforme, GeoPackage from 2025', () => {
       for (const year of YEARS) {
         const source = getSourceForLevel(year, 'commune')
@@ -183,12 +198,24 @@ describe('Processing France Contours', () => {
     })
   })
 
+  describe('data-fair column keys', () => {
+    it('declares the keys data-fair derives from the GeoJSON property names', () => {
+      // data-fair: slug(name, { lower: true, strict: true, replacement: '_' })
+      for (const level of ['region', 'departement', 'epci', 'commune', 'arrondissement-municipal', 'iris'] as const) {
+        for (const prop of toDataFairSchema(getDatasetSchema(level, { year: 2026, combineCommunesAndPlm: true }))) {
+          assert.match(prop.key, /^[a-z0-9_]+$/, `${level}: ${prop.key}`)
+        }
+      }
+      assert.equal(toDataFairSchema([{ key: 'INSEE_COM', title: 'Code commune', type: 'string' }])[0].key, 'insee_com')
+    })
+  })
+
   describe('dataset metadata', () => {
-    const levels = ['region', 'departement', 'epci', 'commune', 'arrondissement-municipal', 'iris'] as const
+    const levels = LEVEL_ORDER
 
     it('follows the data-fair guidelines for summaries and descriptions', () => {
       for (const level of levels) {
-        for (const year of [2017, 2026]) {
+        for (const year of [2017, 2026].filter(y => isLevelAvailable(y, level))) {
           const meta = getDatasetMetadata(level, year, getSourceForLevel(year, level), { combineCommunesAndPlm: true })
           assert.ok(meta.summary.length >= 150 && meta.summary.length <= 300, `${level} ${year} summary length ${meta.summary.length}`)
           assert.ok(!/^ce jeu de données/i.test(meta.summary))
@@ -248,7 +275,7 @@ describe('Processing France Contours', () => {
       }, 'commune', 2023, memory, { combineCommunesAndPlm: true, schemaKeys: keysOf('commune', 2023) })
       assert.equal(commune.id, 'com-2023-01001')
       assert.deepEqual(commune.properties, {
-        niveau: 'commune', annee: 2023, NOM_COM: "L'Abergement-Clémenciat", INSEE_COM: '01001', STATUT: 'Commune simple', INSEE_ARR: '012', INSEE_CAN: '01', NOM_REG: 'Auvergne-Rhône-Alpes', INSEE_REG: '84', NOM_DEP: 'Ain', INSEE_DEP: '01', NOM_EPCI: 'CC de la Dombes', CODE_EPCI: '200042497', TYPE_EPCI: 'CC', POPULATION: 800, INSEE_RATT: ''
+        niveau: 'commune', annee: 2023, NOM_COM: "L'Abergement-Clémenciat", INSEE_COM: '01001', STATUT: 'Commune simple', INSEE_ARR: '012', INSEE_CAN: '0101', NOM_REG: 'Auvergne-Rhône-Alpes', INSEE_REG: '84', NOM_DEP: 'Ain', INSEE_DEP: '01', NOM_EPCI: 'CC de la Dombes', CODE_EPCI: '200042497', TYPE_EPCI: 'CC', POPULATION: 800, INSEE_RATT: ''
       })
     })
 
@@ -298,6 +325,15 @@ describe('Processing France Contours', () => {
       assert.deepEqual([...keysOf('commune')].filter(k => k !== 'geometry').sort(), Object.keys(arm.properties).sort())
     })
 
+    it('reads the ADMIN-EXPRESS 2.x arrondissements (code in INSEE_COM, parent in INSEE_RATT)', () => {
+      const memory = createTerritoryMemory()
+      const options = { combineCommunesAndPlm: true, schemaKeys: keysOf('commune', 2020) }
+      const arm = normalizeFeature({ geometry: null, properties: { ID: 'ARR_MUNI_FR0000009736553', NOM_COM: 'Paris 16e Arrondissement', INSEE_COM: '75116', INSEE_RATT: '75056', TYPE: 'ARM', POPULATION: 166361 } }, 'arrondissement-municipal', 2020, memory, options)
+      assert.equal(arm.id, 'com-2020-75116')
+      assert.equal(arm.properties.INSEE_COM, '75116')
+      assert.equal(arm.properties.INSEE_RATT, '75056')
+    })
+
     it('keeps the parent communes in the standalone mode but still remembers them for the arrondissements', () => {
       const memory = createTerritoryMemory()
       memory.epci.set('200046977', { nomEpci: 'Métropole de Lyon', typeEpci: 'METRO' })
@@ -310,6 +346,34 @@ describe('Processing France Contours', () => {
       assert.equal(arm.properties.niveau, 'arrondissement municipal')
       assert.equal(arm.properties.NOM_EPCI, 'Métropole de Lyon')
       assert.equal(arm.properties.STATUT, undefined)
+    })
+
+    it('builds complete arrondissement and canton codes and carries their names to older millésimes', () => {
+      const memory = createTerritoryMemory()
+      memory.departments.set('01', { nomDep: 'Ain', chfDep: '01053', inseeReg: '84', nomReg: 'Auvergne-Rhône-Alpes' })
+      memory.regions.set('84', { nomReg: 'Auvergne-Rhône-Alpes', chfReg: '69123' })
+      // ADMIN-EXPRESS-COG 4.0 (2026): complete codes and names
+      const arr2026 = normalizeFeature({ geometry: null, properties: { nom_officiel: 'Belley', code_insee: '011', code_insee_du_departement: '01', code_insee_de_la_region: '84' } }, 'arrondissement', 2026, memory)
+      assert.deepEqual(arr2026.properties, { niveau: 'arrondissement', annee: 2026, NOM_ARR: 'Belley', INSEE_ARR: '011', NOM_DEP: 'Ain', INSEE_DEP: '01', NOM_REG: 'Auvergne-Rhône-Alpes', INSEE_REG: '84' })
+      const can2026 = normalizeFeature({ geometry: null, properties: { nom_officiel: 'Ambérieu-en-Bugey', code_insee: '0101', code_insee_du_departement: '01', code_insee_de_la_region: '84' } }, 'canton', 2026, memory)
+      assert.equal(can2026.id, 'can-2026-0101')
+      // ADMIN-EXPRESS-COG 3.0 (2021): local codes, no names
+      const arr2021 = normalizeFeature({ geometry: null, properties: { INSEE_ARR: '1', INSEE_DEP: '01', INSEE_REG: '84' } }, 'arrondissement', 2021, memory)
+      assert.equal(arr2021.properties.INSEE_ARR, '011')
+      assert.equal(arr2021.properties.NOM_ARR, 'Belley')
+      const can2021 = normalizeFeature({ geometry: null, properties: { INSEE_CAN: '01', INSEE_ARR: '1', INSEE_DEP: '01', INSEE_REG: '84' } }, 'canton', 2021, memory)
+      assert.deepEqual([can2021.properties.INSEE_CAN, can2021.properties.NOM_CAN], ['0101', 'Ambérieu-en-Bugey'])
+      assert.equal(normalizeFeature({ geometry: null, properties: { nom_officiel: 'Lyon', code_insee: 'NR', code_insee_du_departement: 'NR' } }, 'canton', 2026, memory), null)
+      assert.equal(departementalCode('16', '971'), '97116')
+      assert.equal(departementalCode('9712', '971'), '9712')
+      assert.equal(departementalCode('', '01'), '')
+      assert.deepEqual(Object.keys(can2021.properties).sort(), [...keysOf('canton')].filter(k => k !== 'geometry').sort())
+    })
+
+    it('reads the ADMIN-EXPRESS-COG 2.x municipal arrondissements (code in INSEE_COM, parent in INSEE_RATT)', () => {
+      const memory = createTerritoryMemory()
+      const arm = normalizeFeature({ geometry: null, properties: { NOM_COM: 'Paris 16e Arrondissement', INSEE_COM: '75116', INSEE_RATT: '75056', TYPE: 'ARM', POPULATION: 166361 } }, 'arrondissement-municipal', 2020, memory, { combineCommunesAndPlm: true })
+      assert.deepEqual([arm.properties.INSEE_COM, arm.properties.INSEE_RATT], ['75116', '75056'])
     })
 
     it('rejects a feature without its pivot code', () => {
@@ -411,7 +475,7 @@ describe('Processing France Contours', () => {
     beforeEach(() => { resetStopState() })
 
     it('prepare returns the config untouched (no secret)', async () => {
-      const config = { datasetMode: 'create', year: 2026, datasets: [{ level: 'commune', simplifyLevel: 'medium' }] } as any
+      const config = { datasetMode: 'create', years: [2026], datasets: [{ level: 'commune', simplifyLevel: 'medium' }] } as any
       const res = await plugin.prepare({ processingConfig: config, secrets: {} })
       assert.deepEqual(res.processingConfig, config)
     })

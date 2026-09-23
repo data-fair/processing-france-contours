@@ -18,6 +18,14 @@
           "title": "Départements"
         },
         {
+          "const": "arrondissement",
+          "title": "Arrondissements départementaux"
+        },
+        {
+          "const": "canton",
+          "title": "Cantons (à partir de 2020)"
+        },
+        {
           "const": "epci",
           "title": "EPCI"
         },
@@ -27,7 +35,7 @@
         },
         {
           "const": "arrondissement-municipal",
-          "title": "Arrondissements municipaux"
+          "title": "Arrondissements municipaux (à partir de 2020)"
         },
         {
           "const": "iris",
@@ -42,20 +50,32 @@
       "oneOf": [
         {
           "const": "full",
-          "title": "Aucune (tracés IGN d'origine)"
-        },
-        {
-          "const": "precise",
-          "title": "Précise (0,0001°, ~10 m)"
+          "title": "Aucune (tracés d'origine)"
         },
         {
           "const": "medium",
-          "title": "Moyenne (0,001°, ~100 m)"
+          "title": "Moyenne (~100 m)"
         },
         {
           "const": "simple",
-          "title": "Forte (0,01°, ~1 km)"
+          "title": "Forte (~1 km)"
         }
+      ]
+    },
+    "year": {
+      "type": "integer",
+      "title": "Millésime",
+      "enum": [
+        2026,
+        2025,
+        2024,
+        2023,
+        2022,
+        2021,
+        2020,
+        2019,
+        2018,
+        2017
       ]
     }
   },
@@ -86,6 +106,18 @@
               "type": "string",
               "const": "create"
             },
+            "years": {
+              "type": "array",
+              "title": "Millésimes",
+              "default": [
+                2026
+              ],
+              "minItems": 1,
+              "description": "Un jeu de données est créé par millésime et par ligne. Les millésimes passés ne sont jamais republiés par l'IGN : ils ne sont créés qu'une fois. Traités ensemble, les plus anciens reprennent les libellés les plus complets des plus récents.",
+              "items": {
+                "$ref": "#/$defs/year"
+              }
+            },
             "datasetIdPrefix": {
               "type": "string",
               "title": "Préfixe des slugs",
@@ -94,14 +126,14 @@
             },
             "createAll": {
               "type": "boolean",
-              "title": "Tout créer (tous les niveaux dans toutes les simplifications)",
+              "title": "Tous les niveaux dans toutes les simplifications",
               "default": false,
-              "description": "Pour un lancement initial : produit les 24 combinaisons niveau × simplification. Les tracés IRIS non simplifiés sont volumineux."
+              "description": "Pour un lancement initial : produit toutes les combinaisons niveau × simplification pour chaque millésime choisi. Les cantons et les arrondissements municipaux n'existent qu'à partir de 2020."
             },
             "datasets": {
               "type": "array",
               "title": "Jeux de données à créer",
-              "description": "Une ligne par jeu de données. Un même niveau peut figurer plusieurs fois avec des simplifications différentes.",
+              "description": "Une ligne par niveau et simplification, déclinée pour chaque millésime choisi. Un même niveau peut figurer plusieurs fois avec des simplifications différentes.",
               "layout": {
                 "if": "!parent.data.createAll",
                 "listEditMode": "inline",
@@ -172,7 +204,7 @@
             "datasets": {
               "type": "array",
               "title": "Jeux de données à mettre à jour",
-              "description": "Une ligne par jeu de données, remplie automatiquement après la création. Le jeu est remplacé par le millésime choisi dans l'onglet Paramètres ; son slug ne change pas.",
+              "description": "Une ligne par jeu de données, remplie automatiquement après la création.",
               "layout": {
                 "listEditMode": "inline",
                 "messages": {
@@ -182,11 +214,18 @@
               "items": {
                 "type": "object",
                 "required": [
+                  "year",
                   "level",
                   "simplifyLevel",
                   "dataset"
                 ],
                 "layout": [
+                  {
+                    "children": [
+                      "year"
+                    ],
+                    "cols": 2
+                  },
                   {
                     "children": [
                       "level"
@@ -197,16 +236,19 @@
                     "children": [
                       "simplifyLevel"
                     ],
-                    "cols": 4
+                    "cols": 3
                   },
                   {
                     "children": [
                       "dataset"
                     ],
-                    "cols": 5
+                    "cols": 4
                   }
                 ],
                 "properties": {
+                  "year": {
+                    "$ref": "#/$defs/year"
+                  },
                   "level": {
                     "$ref": "#/$defs/level"
                   },
@@ -249,24 +291,6 @@
     {
       "title": "Paramètres",
       "properties": {
-        "year": {
-          "type": "integer",
-          "title": "Millésime",
-          "default": 2026,
-          "description": "Livraisons ADMIN-EXPRESS-COG et CONTOURS-IRIS de l'IGN (Géoplateforme). Pour conserver plusieurs millésimes côte à côte, créez un traitement par millésime.",
-          "enum": [
-            2026,
-            2025,
-            2024,
-            2023,
-            2022,
-            2021,
-            2020,
-            2019,
-            2018,
-            2017
-          ]
-        },
         "combineCommunesAndPlm": {
           "type": "boolean",
           "title": "Fusionner communes et arrondissements municipaux (PLM)",

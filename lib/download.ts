@@ -12,7 +12,8 @@ import { StopError, assertNotStopped, isStopped } from './state.ts'
 
 type Log = ProcessingContext<ProcessingConfig>['log']
 
-const MAX_ATTEMPTS = 5
+/** Consecutive failures without any byte received; an interruption that made progress does not count */
+const MAX_FAILURES = 5
 const PROGRESS_STEP = 20 * 1024 * 1024
 // The Géoplateforme answers 403 to the default "axios/x.y.z" user agent
 const USER_AGENT = 'data-fair-processing-france-contours'
@@ -21,18 +22,18 @@ export const downloadFile = async (url: string, filePath: string, axios: AxiosIn
   const fileName = path.basename(filePath)
   const tmpFile = `${filePath}.tmp`
   const task = `Téléchargement de ${fileName}`
+  const receivedSize = async () => (await fs.pathExists(tmpFile)) ? (await fs.stat(tmpFile)).size : 0
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  for (let failures = 0; ;) {
     assertNotStopped()
+    // The Géoplateforme often cuts large transfers: resume from the bytes already received
+    const received = await receivedSize()
     try {
-      // The Géoplateforme often cuts large transfers: resume from the bytes already received
-      const received = (await fs.pathExists(tmpFile)) ? (await fs.stat(tmpFile)).size : 0
       const headers: Record<string, string> = { 'User-Agent': USER_AGENT }
       if (received) headers.Range = `bytes=${received}-`
       const response = await axios({ url, method: 'GET', responseType: 'stream', timeout: 600000, headers })
       // a 200 to a range request means the server sends the whole file again
       const resumed = received > 0 && response.status === 206
-      if (resumed) await log.info(`Reprise du téléchargement à ${formatBytes(received)}.`)
       let downloaded = resumed ? received : 0
       const total = downloaded + (Number(response.headers['content-length']) || 0)
       let lastReported = 0
@@ -57,9 +58,13 @@ export const downloadFile = async (url: string, filePath: string, axios: AxiosIn
       if (isStopped()) throw new StopError()
       // range beyond the end: the partial file is unusable, start over
       if (err.response?.status === 416) await fs.remove(tmpFile)
-      if (attempt === MAX_ATTEMPTS) throw new Error(`Impossible de télécharger ${url} après ${MAX_ATTEMPTS} tentatives : ${err.message}`)
-      await log.warning(`Échec du téléchargement (${attempt}/${MAX_ATTEMPTS}) : ${err.message}. Nouvel essai dans 5s...`)
-      await sleep(5000)
+      const size = await receivedSize()
+      if (size <= received) failures++
+      else failures = 0
+      if (failures >= MAX_FAILURES) throw new Error(`Impossible de télécharger ${url} après ${MAX_FAILURES} échecs consécutifs : ${err.message}`)
+      const delay = 5 * 2 ** failures
+      await log.warning(`Téléchargement de ${fileName} interrompu à ${formatBytes(size)} (${err.message}), reprise dans ${delay}s.`)
+      await sleep(delay * 1000)
     }
   }
 }
@@ -80,23 +85,16 @@ export const downloadArchive = async (
   const archivePath = path.join(downloadDir, fileName)
   const extractDir = path.join(downloadDir, fileName.replace(/\.7z$/, ''))
 
-  if (await fs.pathExists(archivePath)) {
-    await log.info(`L'archive ${fileName} a déjà été téléchargée.`)
-  } else {
-    await downloadFile(archiveUrl, archivePath, axios, log)
-  }
+  if (!await fs.pathExists(archivePath)) await downloadFile(archiveUrl, archivePath, axios, log)
 
-  if (await fs.pathExists(extractDir)) {
-    await log.info(`L'archive ${fileName} a déjà été extraite.`)
-  } else {
+  if (!await fs.pathExists(extractDir)) {
     assertNotStopped()
-    await log.info(`Extraction de l'archive ${fileName}...`)
     const tmpDir = `${extractDir}.tmp`
     await fs.emptyDir(tmpDir)
     try {
       const extractor = await extract7z(archivePath, tmpDir)
       await fs.move(tmpDir, extractDir)
-      await log.info(`Extraction terminée (${extractor === 'wasm' ? '7z-wasm' : '7z natif'}).`)
+      await log.info(`Archive ${fileName} extraite (${extractor === 'wasm' ? '7z-wasm' : '7z natif'}).`)
     } catch (err: any) {
       await fs.remove(tmpDir).catch(() => {})
       if (isStopped()) throw new StopError()

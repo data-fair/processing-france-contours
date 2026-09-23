@@ -45,12 +45,22 @@ export const fetchExistingDatasetsBySlug = async (axios: AxiosInstance, log: Log
   return bySlug
 }
 
+/**
+ * data-fair derives the column keys from the GeoJSON property names with a lowercasing slug
+ * (INSEE_COM → insee_com). A schema declared with the original names matches no column and is
+ * dropped: titles, concepts and forced string types are lost (codes then detected as integers).
+ */
+export const toDataFairSchema = (schema: DatasetProperty[]): DatasetProperty[] =>
+  schema.map(p => ({ ...p, key: p.key.toLowerCase() }))
+
 export interface DatasetUpload {
   slug: string
   title: string
   filePath: string
   schema: DatasetProperty[]
   metadata: DatasetMetadata
+  /** Number of features, for the log */
+  count: number
 }
 
 /**
@@ -58,7 +68,7 @@ export interface DatasetUpload {
  * these datasets: title, schema annotations and metadata are re-applied at every run.
  */
 export const uploadDataset = async (
-  { slug, title, filePath, schema, metadata }: DatasetUpload,
+  { slug, title, filePath, schema, metadata, count }: DatasetUpload,
   existing: { id: string } | undefined,
   axios: AxiosInstance,
   log: Log
@@ -66,13 +76,12 @@ export const uploadDataset = async (
   assertNotStopped()
   const actionLabel = existing ? 'Mise à jour' : 'Création'
   const stats = await fs.stat(filePath)
-  await log.info(`${actionLabel} du jeu de données "${title}" (${formatBytes(stats.size)})...`)
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     assertNotStopped()
     try {
       const formData = new FormData()
-      formData.append('schema', JSON.stringify(schema))
+      formData.append('schema', JSON.stringify(toDataFairSchema(schema)))
       formData.append('title', title)
       if (!existing) formData.append('slug', slug)
       // multipart parts are strings, data-fair parses the object/array fields as JSON
@@ -93,7 +102,7 @@ export const uploadDataset = async (
       })
 
       const dataset = response.data
-      await log.info(`${actionLabel} réussie : ${dataset.title ?? title} (id : ${dataset.id}, slug : ${dataset.slug ?? slug})`)
+      await log.info(`${actionLabel} de « ${dataset.title ?? title} » (${count} entités, ${formatBytes(stats.size)}, id ${dataset.id}, slug ${dataset.slug ?? slug})`)
       return { id: dataset.id, title: dataset.title ?? title }
     } catch (err: any) {
       if (isStopped()) throw new StopError()

@@ -38,6 +38,16 @@ const SUBJECTS: Record<AdministrativeLevel, { summary: string, content: string, 
     content: 'un département, avec son code INSEE, son nom, le code de la commune siège du conseil départemental et la région d\'appartenance',
     keywords: ['départements']
   },
+  arrondissement: {
+    summary: 'Contours des arrondissements départementaux français',
+    content: 'un arrondissement départemental, circonscription administrative de l\'État, avec son code INSEE, son nom, le département et la région d\'appartenance',
+    keywords: ['arrondissements']
+  },
+  canton: {
+    summary: 'Contours des cantons français',
+    content: 'un canton, circonscription d\'élection des conseillers départementaux, avec son code INSEE, son nom, le département et la région d\'appartenance',
+    keywords: ['cantons']
+  },
   epci: {
     summary: 'Contours des établissements publics de coopération intercommunale (EPCI) à fiscalité propre',
     content: 'un EPCI à fiscalité propre (communauté de communes, d\'agglomération, urbaine ou métropole), avec son numéro SIREN, son nom et sa nature juridique',

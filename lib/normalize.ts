@@ -12,6 +12,9 @@ export interface TerritoryMemory {
   regions: Map<string, { nomReg: string, chfReg: string }>
   departments: Map<string, { nomDep: string, chfDep: string, inseeReg: string, nomReg: string }>
   epci: Map<string, { nomEpci: string, typeEpci: string }>
+  /** Names of arrondissements and cantons, missing from some deliveries (ADMIN-EXPRESS 1.x and 3.x) */
+  arrondissements: Map<string, string>
+  cantons: Map<string, string>
   /** Paris, Marseille and Lyon, so that their arrondissements inherit the parent's territory info */
   parentCommunes: Map<string, { inseeDep: string, nomDep: string, inseeReg: string, nomReg: string, codeEpci: string, nomEpci: string, typeEpci: string }>
   /** ADMIN-EXPRESS 4.0 chef-lieu point layers, keyed by `reg:<code>` / `dep:<code>` */
@@ -20,7 +23,7 @@ export interface TerritoryMemory {
 
 export interface NormalizeOptions {
   combineCommunesAndPlm?: boolean
-  /** Do not drop Paris, Lyon and Marseille even in combined mode (no arrondissement layer in the delivery, e.g. 2017) */
+  /** Do not drop Paris, Lyon and Marseille even in combined mode (no arrondissement layer in the delivery, 2017 to 2019) */
   keepPlmParents?: boolean
   /** Keys of the target dataset schema; when given, POPULATION is emitted only if the schema has it */
   schemaKeys?: Set<string>
@@ -30,6 +33,8 @@ export const createTerritoryMemory = (): TerritoryMemory => ({
   regions: new Map(),
   departments: new Map(),
   epci: new Map(),
+  arrondissements: new Map(),
+  cantons: new Map(),
   parentCommunes: new Map(),
   chefLieux: new Map()
 })
@@ -68,6 +73,12 @@ const code = (props: Props, aliases: string[], length = 0): string => {
   const value = formatInseeCode(pick(props, aliases), length)
   return NOT_AVAILABLE.has(value) ? '' : value
 }
+/**
+ * Arrondissement and canton codes are delivered local to the département up to ADMIN-EXPRESS 3.x
+ * ("2", "04") and complete from 4.0 ("012", "0104"): always return the complete INSEE code.
+ */
+export const departementalCode = (value: string, inseeDep: string): string =>
+  !value || (value.length > inseeDep.length && value.startsWith(inseeDep)) ? value : inseeDep + value
 const requireCode = (value: string, label: string, raw: Props): string => {
   if (!value) throw new Error(`Code ${label} manquant sur une entité : ${JSON.stringify(raw)}`)
   return value
@@ -94,6 +105,10 @@ const F = {
   comName: ['nom_com', 'nom', 'nom_officiel'],
   comArr: ['insee_arr', 'code_insee_de_l_arrondissement'],
   comCan: ['insee_can', 'code_insee_du_canton'],
+  arrCode: ['code_insee', 'insee_arr'],
+  arrName: ['nom_officiel', 'nom_arr', 'nom'],
+  canCode: ['code_insee', 'insee_can'],
+  canName: ['nom_officiel', 'nom_can', 'nom'],
   armCode: ['insee_arm', 'code_insee'],
   armParent: ['code_insee_de_la_commune_de_rattach', 'insee_ratt', 'insee_com'],
   armName: ['nom_arm', 'nom_com', 'nom', 'nom_officiel'],
@@ -203,6 +218,31 @@ export const normalizeFeature = (
       })
     }
 
+    case 'arrondissement':
+    case 'canton': {
+      const isArr = level === 'arrondissement'
+      const inseeDep = code(props, F.depCodeOfChild, 2)
+      const codeAliases = isArr ? F.arrCode : F.canCode
+      // the IGN delivers the Métropole de Lyon as a canton with every code "NR": not a real canton
+      if (NOT_AVAILABLE.has(str(props, codeAliases))) return null
+      const localCode = code(props, codeAliases)
+      const fullCode = requireCode(departementalCode(localCode, inseeDep), level, raw)
+      const names = isArr ? memory.arrondissements : memory.cantons
+      const name = str(props, isArr ? F.arrName : F.canName) || names.get(fullCode) || ''
+      if (name) names.set(fullCode, name)
+      const depInfo = memory.departments.get(inseeDep)
+      const inseeReg = code(props, F.regCodeOfChild, 2) || depInfo?.inseeReg || ''
+      const territory = {
+        NOM_DEP: depInfo?.nomDep ?? '',
+        INSEE_DEP: inseeDep,
+        NOM_REG: memory.regions.get(inseeReg)?.nomReg || depInfo?.nomReg || '',
+        INSEE_REG: inseeReg
+      }
+      return isArr
+        ? build(`arr-${year}-${fullCode}`, { niveau: 'arrondissement', annee: year, NOM_ARR: name, INSEE_ARR: fullCode, ...territory })
+        : build(`can-${year}-${fullCode}`, { niveau: 'canton', annee: year, NOM_CAN: name, INSEE_CAN: fullCode, ...territory })
+    }
+
     case 'epci': {
       const codeEpci = requireCode(code(props, F.epciCode, 9), 'EPCI', raw)
       const nomEpci = str(props, F.epciName)
@@ -242,8 +282,8 @@ export const normalizeFeature = (
         NOM_COM: str(props, F.comName),
         INSEE_COM: inseeCom,
         STATUT: str(props, ['statut']),
-        INSEE_ARR: code(props, F.comArr),
-        INSEE_CAN: code(props, F.comCan),
+        INSEE_ARR: departementalCode(code(props, F.comArr), inseeDep),
+        INSEE_CAN: departementalCode(code(props, F.comCan), inseeDep),
         NOM_REG: territory.nomReg,
         INSEE_REG: inseeReg,
         NOM_DEP: territory.nomDep,
@@ -258,7 +298,8 @@ export const normalizeFeature = (
     }
 
     case 'arrondissement-municipal': {
-      const inseeArm = requireCode(code(props, F.armCode, 5), 'arrondissement municipal', raw)
+      // ADMIN-EXPRESS 2.x stores the arrondissement code in INSEE_COM and the parent in INSEE_RATT
+      const inseeArm = requireCode(code(props, F.armCode, 5) || (props.insee_ratt ? code(props, ['insee_com'], 5) : ''), 'arrondissement municipal', raw)
       const inseeRatt = code(props, F.armParent, 5)
       const parent = memory.parentCommunes.get(inseeRatt)
       const inseeDep = parent?.inseeDep || inseeArm.slice(0, 2)
@@ -334,7 +375,6 @@ export const normalizeGeojson = async (
   options: NormalizeOptions & { schemaKeys: Set<string> },
   log: Log
 ): Promise<number> => {
-  await log.info(`Normalisation du niveau ${level} (millésime ${year})...`)
   const tmpOutputPath = `${outputPath}.tmp`
   const writeStream = fs.createWriteStream(tmpOutputPath, { encoding: 'utf8' })
   let count = 0
@@ -357,7 +397,6 @@ export const normalizeGeojson = async (
       }
     }
     if (level === 'commune' && options.combineCommunesAndPlm && input.armPaths?.length) {
-      await log.info('Fusion des arrondissements municipaux de Paris, Lyon et Marseille dans le niveau commune...')
       for (const filePath of input.armPaths) {
         for await (const raw of parseGeojsonFeatures(filePath)) {
           const feature = normalizeFeature(raw, 'arrondissement-municipal', year, memory, options)
@@ -374,6 +413,5 @@ export const normalizeGeojson = async (
     throw err
   }
 
-  await log.info(`Normalisation terminée pour ${level} : ${count} entités écrites.`)
   return count
 }

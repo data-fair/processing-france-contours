@@ -56,6 +56,7 @@ const NOM_REG: DatasetProperty = {
   'x-capabilities': labelCapabilities
 }
 const NOM_REG_LABEL: DatasetProperty = { ...NOM_REG, 'x-refersTo': LABEL_CONCEPT }
+const NOM_REG_REGION: DatasetProperty = { ...NOM_REG, 'x-refersTo': 'https://schema.org/addressRegion' }
 
 const CHF_REG: DatasetProperty = {
   key: 'CHF_REG',
@@ -82,6 +83,7 @@ const NOM_DEP: DatasetProperty = {
   'x-capabilities': labelCapabilities
 }
 const NOM_DEP_LABEL: DatasetProperty = { ...NOM_DEP, 'x-refersTo': LABEL_CONCEPT }
+const NOM_DEP_DEPARTEMENT: DatasetProperty = { ...NOM_DEP, 'x-refersTo': 'http://rdf.insee.fr/def/geo#Departement' }
 
 const CHF_DEP: DatasetProperty = {
   key: 'CHF_DEP',
@@ -169,9 +171,9 @@ const STATUT: DatasetProperty = {
 
 const INSEE_ARR: DatasetProperty = {
   key: 'INSEE_ARR',
-  title: 'Code arrondissement départemental',
+  title: 'Code arrondissement',
   type: 'string',
-  description: 'Tel que livré par l\'IGN : numéro dans le département jusqu\'en 2024, préfixé du département à partir de 2025',
+  description: 'Code INSEE complet de l\'arrondissement départemental : code du département suivi du numéro de l\'arrondissement',
   ignoreDetection: true,
   'x-capabilities': codeCapabilities
 }
@@ -180,8 +182,27 @@ const INSEE_CAN: DatasetProperty = {
   key: 'INSEE_CAN',
   title: 'Code canton',
   type: 'string',
+  description: 'Code INSEE complet du canton : code du département suivi du numéro du canton',
   ignoreDetection: true,
   'x-capabilities': codeCapabilities
+}
+
+const NOM_ARR_LABEL: DatasetProperty = {
+  key: 'NOM_ARR',
+  title: 'Nom arrondissement',
+  type: 'string',
+  description: 'Absent de certaines livraisons de l\'IGN (2017, 2018, 2021) : repris d\'un millésime plus récent traité dans la même exécution, vide sinon',
+  'x-refersTo': LABEL_CONCEPT,
+  'x-capabilities': labelCapabilities
+}
+
+const NOM_CAN_LABEL: DatasetProperty = {
+  key: 'NOM_CAN',
+  title: 'Nom canton',
+  type: 'string',
+  description: 'Livré par l\'IGN à partir de 2025 : repris d\'un millésime plus récent traité dans la même exécution, vide sinon',
+  'x-refersTo': LABEL_CONCEPT,
+  'x-capabilities': labelCapabilities
 }
 
 const CODE_IRIS: DatasetProperty = {
@@ -240,7 +261,13 @@ export const getDatasetSchema = (
       properties = [NIVEAU, ANNEE, NOM_REG_LABEL, INSEE_REG, CHF_REG]
       break
     case 'departement':
-      properties = [NIVEAU, ANNEE, NOM_DEP_LABEL, INSEE_DEP, CHF_DEP, NOM_REG, INSEE_REG]
+      properties = [NIVEAU, ANNEE, NOM_DEP_LABEL, INSEE_DEP, CHF_DEP, NOM_REG_REGION, INSEE_REG]
+      break
+    case 'arrondissement':
+      properties = [NIVEAU, ANNEE, NOM_ARR_LABEL, INSEE_ARR, NOM_DEP_DEPARTEMENT, INSEE_DEP, NOM_REG_REGION, INSEE_REG]
+      break
+    case 'canton':
+      properties = [NIVEAU, ANNEE, NOM_CAN_LABEL, INSEE_CAN, NOM_DEP_DEPARTEMENT, INSEE_DEP, NOM_REG_REGION, INSEE_REG]
       break
     case 'epci':
       properties = [NIVEAU, ANNEE, NOM_EPCI_LABEL, CODE_EPCI, TYPE_EPCI]
@@ -248,7 +275,7 @@ export const getDatasetSchema = (
     case 'commune': {
       properties = [
         NIVEAU, ANNEE, NOM_COM, INSEE_COM, STATUT, POPULATION,
-        INSEE_ARR, INSEE_CAN, NOM_REG, INSEE_REG, NOM_DEP, INSEE_DEP,
+        INSEE_ARR, INSEE_CAN, NOM_REG_REGION, INSEE_REG, NOM_DEP_DEPARTEMENT, INSEE_DEP,
         NOM_EPCI, CODE_EPCI, TYPE_EPCI
       ]
       if (options.combineCommunesAndPlm) {
@@ -262,7 +289,7 @@ export const getDatasetSchema = (
     case 'arrondissement-municipal':
       properties = [
         NIVEAU, ANNEE, NOM_COM, INSEE_COM, POPULATION, INSEE_RATT,
-        NOM_REG, INSEE_REG, NOM_DEP, INSEE_DEP, NOM_EPCI, CODE_EPCI, TYPE_EPCI
+        NOM_REG_REGION, INSEE_REG, NOM_DEP_DEPARTEMENT, INSEE_DEP, NOM_EPCI, CODE_EPCI, TYPE_EPCI
       ]
       break
     case 'iris':

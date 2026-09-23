@@ -1,6 +1,6 @@
-export type AdministrativeLevel = 'region' | 'departement' | 'epci' | 'commune' | 'arrondissement-municipal' | 'iris'
+export type AdministrativeLevel = 'region' | 'departement' | 'arrondissement' | 'canton' | 'epci' | 'commune' | 'arrondissement-municipal' | 'iris'
 
-export type SimplifyLevel = 'full' | 'precise' | 'medium' | 'simple'
+export type SimplifyLevel = 'full' | 'medium' | 'simple'
 
 export type ArchiveFormat = 'gpkg' | 'shp'
 
@@ -24,7 +24,6 @@ export interface LevelSource {
 /** Tolerance in degrees (applied after reprojection to EPSG:4326) */
 export const SIMPLIFY_TOLERANCES: Record<SimplifyLevel, number | null> = {
   full: null,
-  precise: 0.0001,
   medium: 0.001,
   simple: 0.01
 }
@@ -82,10 +81,22 @@ export const YEARS = Object.keys(ADMIN_EXPRESS_ARCHIVES).map(Number).sort((a, b)
 const ADMIN_EXPRESS_LAYERS: Record<Exclude<AdministrativeLevel, 'iris'>, string> = {
   region: 'REGION',
   departement: 'DEPARTEMENT',
+  arrondissement: 'ARRONDISSEMENT',
+  canton: 'CANTON',
   epci: 'EPCI',
   commune: 'COMMUNE',
   'arrondissement-municipal': 'ARRONDISSEMENT_MUNICIPAL'
 }
+
+/** The CANTON and ARRONDISSEMENT_MUNICIPAL layers only exist from ADMIN-EXPRESS-COG 2.1 (millésime 2020) */
+export const FIRST_CANTON_AND_ARM_YEAR = 2020
+
+export const isLevelAvailable = (year: number, level: AdministrativeLevel): boolean =>
+  !['canton', 'arrondissement-municipal'].includes(level) || year >= FIRST_CANTON_AND_ARM_YEAR
+
+// ADMIN-EXPRESS-COG 1.x and 2.x name the arrondissement layer ARRONDISSEMENT_DEPARTEMENTAL
+const adminExpressLayer = (year: number, level: Exclude<AdministrativeLevel, 'iris'>): string =>
+  level === 'arrondissement' && year <= 2020 ? 'ARRONDISSEMENT_DEPARTEMENTAL' : ADMIN_EXPRESS_LAYERS[level]
 
 const CHEF_LIEU_LAYERS: Partial<Record<AdministrativeLevel, string>> = {
   region: 'chef_lieu_de_region',
@@ -100,9 +111,10 @@ export const getSourceForLevel = (year: number, level: AdministrativeLevel): Lev
   }
   const archive = ADMIN_EXPRESS_ARCHIVES[year]
   if (!archive) throw new Error(`No ADMIN-EXPRESS-COG source is known for ${year}`)
+  if (!isLevelAvailable(year, level)) throw new Error(`No ${level} layer in ADMIN-EXPRESS-COG ${year}`)
   return {
     archives: [archive],
-    layer: ADMIN_EXPRESS_LAYERS[level],
+    layer: adminExpressLayer(year, level),
     chefLieuLayer: archive.format === 'gpkg' ? CHEF_LIEU_LAYERS[level] : undefined
   }
 }

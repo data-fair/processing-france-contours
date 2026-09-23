@@ -103,12 +103,8 @@ export const convertLayer = async (options: ConvertOptions): Promise<string[]> =
   for (const job of jobs) {
     assertNotStopped()
     const outputPath = path.join(outputDir, job.output)
-    if (await fs.pathExists(outputPath)) {
-      await log.info(`Fichier déjà converti : ${job.output}`)
-    } else {
-      await log.info(`Conversion de ${path.relative(extractDir, job.input)}${job.layer ? ` (couche ${job.layer})` : ''} vers GeoJSON...`)
-      await ogr2geojson(job.input, job.layer, outputPath, simplifyTolerance)
-    }
+    // silent: one line per converted layer would flood the run log of a multi-year run
+    if (!await fs.pathExists(outputPath)) await ogr2geojson(job.input, job.layer, outputPath, simplifyTolerance)
     convertedPaths.push(outputPath)
   }
   return convertedPaths
