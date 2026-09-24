@@ -14,8 +14,6 @@ export interface DatasetProperty {
   'x-labels'?: Record<string, string>
 }
 
-const LABEL_CONCEPT = 'http://www.w3.org/2000/01/rdf-schema#label'
-
 const codeCapabilities = {
   insensitive: false,
   text: false,
@@ -53,10 +51,9 @@ const NOM_REG: DatasetProperty = {
   key: 'NOM_REG',
   title: 'Nom région',
   type: 'string',
+  'x-refersTo': 'https://schema.org/addressRegion',
   'x-capabilities': labelCapabilities
 }
-const NOM_REG_LABEL: DatasetProperty = { ...NOM_REG, 'x-refersTo': LABEL_CONCEPT }
-const NOM_REG_REGION: DatasetProperty = { ...NOM_REG, 'x-refersTo': 'https://schema.org/addressRegion' }
 
 const CHF_REG: DatasetProperty = {
   key: 'CHF_REG',
@@ -80,10 +77,9 @@ const NOM_DEP: DatasetProperty = {
   key: 'NOM_DEP',
   title: 'Nom département',
   type: 'string',
+  'x-refersTo': 'http://rdf.insee.fr/def/geo#Departement',
   'x-capabilities': labelCapabilities
 }
-const NOM_DEP_LABEL: DatasetProperty = { ...NOM_DEP, 'x-refersTo': LABEL_CONCEPT }
-const NOM_DEP_DEPARTEMENT: DatasetProperty = { ...NOM_DEP, 'x-refersTo': 'http://rdf.insee.fr/def/geo#Departement' }
 
 const CHF_DEP: DatasetProperty = {
   key: 'CHF_DEP',
@@ -117,7 +113,6 @@ const NOM_EPCI: DatasetProperty = {
   type: 'string',
   'x-capabilities': labelCapabilities
 }
-const NOM_EPCI_LABEL: DatasetProperty = { ...NOM_EPCI, 'x-refersTo': LABEL_CONCEPT }
 
 const CODE_EPCI: DatasetProperty = {
   key: 'CODE_EPCI',
@@ -187,21 +182,19 @@ const INSEE_CAN: DatasetProperty = {
   'x-capabilities': codeCapabilities
 }
 
-const NOM_ARR_LABEL: DatasetProperty = {
+const NOM_ARR: DatasetProperty = {
   key: 'NOM_ARR',
   title: 'Nom arrondissement',
   type: 'string',
   description: 'Absent de certaines livraisons de l\'IGN (2017, 2018, 2021) : repris d\'un millésime plus récent traité dans la même exécution, vide sinon',
-  'x-refersTo': LABEL_CONCEPT,
   'x-capabilities': labelCapabilities
 }
 
-const NOM_CAN_LABEL: DatasetProperty = {
+const NOM_CAN: DatasetProperty = {
   key: 'NOM_CAN',
   title: 'Nom canton',
   type: 'string',
   description: 'Livré par l\'IGN à partir de 2025 : repris d\'un millésime plus récent traité dans la même exécution, vide sinon',
-  'x-refersTo': LABEL_CONCEPT,
   'x-capabilities': labelCapabilities
 }
 
@@ -218,7 +211,6 @@ const NOM_IRIS: DatasetProperty = {
   key: 'NOM_IRIS',
   title: 'Nom IRIS',
   type: 'string',
-  'x-refersTo': LABEL_CONCEPT,
   'x-capabilities': labelCapabilities
 }
 
@@ -258,24 +250,24 @@ export const getDatasetSchema = (
 
   switch (level) {
     case 'region':
-      properties = [NIVEAU, ANNEE, NOM_REG_LABEL, INSEE_REG, CHF_REG]
+      properties = [NIVEAU, ANNEE, NOM_REG, INSEE_REG, CHF_REG]
       break
     case 'departement':
-      properties = [NIVEAU, ANNEE, NOM_DEP_LABEL, INSEE_DEP, CHF_DEP, NOM_REG_REGION, INSEE_REG]
+      properties = [NIVEAU, ANNEE, NOM_DEP, INSEE_DEP, CHF_DEP, NOM_REG, INSEE_REG]
       break
     case 'arrondissement':
-      properties = [NIVEAU, ANNEE, NOM_ARR_LABEL, INSEE_ARR, NOM_DEP_DEPARTEMENT, INSEE_DEP, NOM_REG_REGION, INSEE_REG]
+      properties = [NIVEAU, ANNEE, NOM_ARR, INSEE_ARR, NOM_DEP, INSEE_DEP, NOM_REG, INSEE_REG]
       break
     case 'canton':
-      properties = [NIVEAU, ANNEE, NOM_CAN_LABEL, INSEE_CAN, NOM_DEP_DEPARTEMENT, INSEE_DEP, NOM_REG_REGION, INSEE_REG]
+      properties = [NIVEAU, ANNEE, NOM_CAN, INSEE_CAN, NOM_DEP, INSEE_DEP, NOM_REG, INSEE_REG]
       break
     case 'epci':
-      properties = [NIVEAU, ANNEE, NOM_EPCI_LABEL, CODE_EPCI, TYPE_EPCI]
+      properties = [NIVEAU, ANNEE, NOM_EPCI, CODE_EPCI, TYPE_EPCI]
       break
     case 'commune': {
       properties = [
         NIVEAU, ANNEE, NOM_COM, INSEE_COM, STATUT, POPULATION,
-        INSEE_ARR, INSEE_CAN, NOM_REG_REGION, INSEE_REG, NOM_DEP_DEPARTEMENT, INSEE_DEP,
+        INSEE_ARR, INSEE_CAN, NOM_REG, INSEE_REG, NOM_DEP, INSEE_DEP,
         NOM_EPCI, CODE_EPCI, TYPE_EPCI
       ]
       if (options.combineCommunesAndPlm) {
@@ -289,7 +281,7 @@ export const getDatasetSchema = (
     case 'arrondissement-municipal':
       properties = [
         NIVEAU, ANNEE, NOM_COM, INSEE_COM, POPULATION, INSEE_RATT,
-        NOM_REG_REGION, INSEE_REG, NOM_DEP_DEPARTEMENT, INSEE_DEP, NOM_EPCI, CODE_EPCI, TYPE_EPCI
+        NOM_REG, INSEE_REG, NOM_DEP, INSEE_DEP, NOM_EPCI, CODE_EPCI, TYPE_EPCI
       ]
       break
     case 'iris':

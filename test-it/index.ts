@@ -295,7 +295,7 @@ describe('Processing France Contours', () => {
         const schema = getDatasetSchema(level, { year: 2026, enableVtPrepare: true, combineCommunesAndPlm: true })
         const concepts = schema.map(p => p['x-refersTo']).filter(Boolean)
         assert.equal(new Set(concepts).size, concepts.length, `${level}: duplicated concept`)
-        assert.ok(concepts.includes('http://www.w3.org/2000/01/rdf-schema#label') || concepts.includes('http://schema.org/City'), `${level}: no label column`)
+        assert.ok(!concepts.includes('http://www.w3.org/2000/01/rdf-schema#label'), `${level}: label concept`)
         for (const prop of schema) {
           assert.ok(prop.title.split(' ').length <= 6, `${prop.key} title too long`)
           if (prop.description) assert.ok(!/^(le |la |les )?\w+ (de|du) /i.test(prop.description) || prop.description.length > 40, `${prop.key}: paraphrase description`)
