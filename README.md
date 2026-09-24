@@ -1,6 +1,6 @@
 # @data-fair/processing-france-contours
 
-Processing plugin for [data-fair/processings](https://github.com/data-fair/processings) that publishes and keeps up to date the official French administrative boundaries (IGN ADMIN-EXPRESS-COG and CONTOURS-IRIS), one dataset per millésime, administrative level and geometric simplification.
+Processing plugin for [data-fair/processings](https://github.com/data-fair/processings) that publishes and keeps up to date the official French administrative boundaries (IGN ADMIN-EXPRESS-COG, its generalized editions COG-CARTO and COG-CARTO-PE, and CONTOURS-IRIS), one dataset per millésime, administrative level and geometric detail.
 
 ## Features
 
@@ -9,9 +9,9 @@ Processing plugin for [data-fair/processings](https://github.com/data-fair/proce
 - **Territory enrichment** — levels are processed from region down to commune, and each feature is completed with the labels and codes of its region, département and EPCI. Millésimes are processed from the most recent one, so that older deliveries inherit the labels they lack (arrondissement and canton names, chef-lieux).
 - **Complete arrondissement and canton codes** — ADMIN-EXPRESS up to 3.x delivers them local to the département (`2`, `04`), 4.0 complete (`012`, `0104`): they are always published complete, in their own datasets and on the communes.
 - **Strictly typed identifiers** — `INSEE_COM`, `INSEE_DEP`, `INSEE_REG`, `CODE_EPCI`, `CODE_IRIS`... are strings (leading zeros and Corsica `2A`/`2B` preserved), annotated with their data-fair concepts (`x-refersTo`). The schema is sent with the lowercase keys data-fair derives from the GeoJSON property names (`INSEE_COM` → `insee_com`), otherwise it would be ignored. Every produced feature is validated against the dataset schema before publication.
-- **Geometry simplification** — reprojection to WGS84 first, then simplification with a tolerance in degrees, so that the same setting gives the same result on Lambert-93 and WGS84 deliveries.
+- **IGN generalization, no home-made simplification** — each geometric detail is a distinct IGN product: `full` (ADMIN-EXPRESS-COG), `carto` (ADMIN-EXPRESS-COG-CARTO, from 2021) and `carto-pe` (ADMIN-EXPRESS-COG-CARTO-PE, small scales, from 2024). The IGN generalization keeps the boundaries shared by neighbours, which a per-polygon simplification does not. A combination the IGN does not publish is skipped with a warning. Geometries are only reprojected to WGS84.
 - **Pre-computed vector tiles** — the `vtPrepare` capability is set on the geometry column so that data-fair generates the vector tiles at indexing time.
-- **Create then update** — the create mode gives each dataset a consistent slug (`<prefix>-<year>-<level>-<simplification>`), reuses a dataset of the account that already has it (e.g. after an interrupted run), then switches the configuration to the update mode with one row per created dataset.
+- **Create then update** — the create mode gives each dataset a consistent slug (`<prefix>-<year>-<level>-<detail>`), reuses a dataset of the account that already has it (e.g. after an interrupted run), then switches the configuration to the update mode with one row per created dataset.
 - **Compact run log and disk usage** — download, extraction, conversion, normalization and upload are progress tasks updated in place, with one summary line per archive and per dataset; the files of a millésime are deleted before the next one.
 - **Resumable downloads** — the Géoplateforme often cuts the transfer of the large archives; an interrupted download resumes from the received bytes with a range request.
 - **Graceful stop** — external commands (7-Zip, ogr2ogr) and the extraction worker are killed when the run is interrupted, and nothing is published.
@@ -22,14 +22,14 @@ Processing plugin for [data-fair/processings](https://github.com/data-fair/proce
 | --- | ----- | ----------- |
 | Jeux de données | `datasetMode` | `create` or `update` |
 | Jeux de données | `years` | Create mode: millésimes (2017 to 2026, default 2026), each row is produced for each of them |
-| Jeux de données | `datasets` | Create mode: rows of `level` (`region`, `departement`, `arrondissement`, `canton`, `epci`, `commune`, `arrondissement-municipal`, `iris`) and `simplifyLevel` (`full` none, `medium` 0.001°, `simple` 0.01°). Update mode: one row per dataset, `year` + `level` + `simplifyLevel` + target `dataset`, filled after the creation |
-| Jeux de données | `createAll` | Create mode: every level in every simplification for each millésime, for an initial load |
+| Jeux de données | `datasets` | Create mode: rows of `level` (`region`, `departement`, `arrondissement`, `canton`, `epci`, `commune`, `arrondissement-municipal`, `iris`) and `simplifyLevel` (`full`, `carto`, `carto-pe`). Update mode: one row per dataset, `year` + `level` + `simplifyLevel` + target `dataset`, filled after the creation |
+| Jeux de données | `createAll` | Create mode: every level in every geometric detail the IGN publishes for each millésime, for an initial load |
 | Jeux de données | `datasetIdPrefix` | Create mode: slug prefix, default `france-contours` |
 | Paramètres | `combineCommunesAndPlm` | Merge the arrondissements of Paris, Lyon and Marseille into the commune level (default on) |
 | Paramètres | `enableVtPrepare` | Set `vtPrepare` on the geometry column (default on) |
 | Paramètres | `skipUpload` | Dry run: download, convert and normalize without creating or updating any dataset |
 
-A row can repeat a level with another simplification, e.g. an unsimplified commune dataset for analysis and a light one for small-scale maps. The IGN never republishes a past millésime, so its datasets are created once; the update mode serves to re-apply a fix of the processing. Cantons and municipal arrondissements only exist from 2020: the rows asking for them before are skipped with a warning.
+A row can repeat a level with another geometric detail, e.g. a `full` commune dataset for analysis and a `carto-pe` one for small-scale maps. The IGN never republishes a past millésime, so its datasets are created once; the update mode serves to re-apply a fix of the processing. The rows the IGN does not cover are skipped with a warning: cantons and municipal arrondissements before 2020, `carto` before 2021, `carto-pe` before 2024 (and its 2024 edition has no municipal arrondissements), and IRIS in anything but `full` (CONTOURS-IRIS has no generalized edition).
 
 ## Produced datasets
 
@@ -54,7 +54,7 @@ Notes on the sources:
 - The IGN "not available" markers (`NR`, `NC`, `ZZZZZZZZZ`) are normalized to empty codes.
 - The Métropole de Lyon is delivered in the canton layer with every code set to `NR`: it is not a canton and is left out.
 - ADMIN-EXPRESS-COG 2.x stores the code of a municipal arrondissement in `INSEE_COM` and its commune in `INSEE_RATT` (3.x: `INSEE_ARM` and `INSEE_COM`).
-- CONTOURS-IRIS 2024 and 2025 are delivered as one archive per territory (metropolitan France and each overseas territory); they are downloaded and merged into a single dataset.
+- CONTOURS-IRIS 2024 and 2025, and ADMIN-EXPRESS-COG-CARTO-PE 2024, are delivered as one archive per territory (metropolitan France and each overseas territory); they are downloaded and merged into a single dataset.
 
 ## Requirements
 

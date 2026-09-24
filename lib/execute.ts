@@ -2,7 +2,7 @@ import fs from 'fs-extra'
 import path from 'node:path'
 import type { RunFunction } from '@data-fair/lib-common-types/processings.js'
 import type { ProcessingConfig } from '#types/processingConfig/index.ts'
-import { type AdministrativeLevel, type SimplifyLevel, SIMPLIFY_TOLERANCES, YEARS, getSourceForLevel, isLevelAvailable } from './sources.ts'
+import { type AdministrativeLevel, type SimplifyLevel, SIMPLIFY_LEVELS, YEARS, getSourceForLevel, isLevelAvailable } from './sources.ts'
 import { downloadArchive } from './download.ts'
 import { convertLayer } from './convert.ts'
 import { createTerritoryMemory, loadChefLieux, normalizeGeojson } from './normalize.ts'
@@ -32,7 +32,6 @@ export const stop = async (): Promise<void> => {
 type DatasetRef = { id: string, title: string }
 export interface Target { year: number, level: AdministrativeLevel, simplifyLevel: SimplifyLevel, dataset?: DatasetRef }
 
-const SIMPLIFY_LEVELS = Object.keys(SIMPLIFY_TOLERANCES) as SimplifyLevel[]
 const targetLabel = (t: Target) => `${t.year} ${t.level} (${t.simplifyLevel})`
 
 /**
@@ -43,10 +42,12 @@ const targetLabel = (t: Target) => `${t.year} ${t.level} (${t.simplifyLevel})`
 export const getTargets = (config: ProcessingConfig): Target[] => {
   let rows: Target[]
   if (config.datasetMode === 'create') {
-    const combinations = config.createAll
-      ? LEVEL_ORDER.flatMap(level => SIMPLIFY_LEVELS.map(simplifyLevel => ({ level, simplifyLevel })))
-      : config.datasets ?? []
-    rows = (config.years?.length ? config.years : [YEARS[0]]).flatMap(year => combinations.map(c => ({ ...c, year })))
+    const years = config.years?.length ? config.years : [YEARS[0]]
+    rows = config.createAll
+      // only what the IGN publishes: createAll must not warn about every missing combination
+      ? years.flatMap(year => LEVEL_ORDER.flatMap(level => SIMPLIFY_LEVELS.map(simplifyLevel => ({ year, level, simplifyLevel }))))
+        .filter(t => isLevelAvailable(t.year, t.level, t.simplifyLevel))
+      : years.flatMap(year => (config.datasets ?? []).map(c => ({ ...c, year })))
   } else {
     rows = (config.datasets ?? []) as Target[]
   }
@@ -66,15 +67,16 @@ export const run: RunFunction<ProcessingConfig> = async (context) => {
   const skipUpload = processingConfig.skipUpload === true
 
   const allTargets = getTargets(processingConfig)
-  const unavailable = allTargets.filter(t => !isLevelAvailable(t.year, t.level))
-  const targets = allTargets.filter(t => isLevelAvailable(t.year, t.level))
-  if (!targets.length) throw new Error('Aucun jeu de données à produire : ajoutez au moins une ligne dans l\'onglet Jeux de données.')
+  if (!allTargets.length) throw new Error('Aucun jeu de données à produire : ajoutez au moins une ligne dans l\'onglet Jeux de données.')
+  const unavailable = allTargets.filter(t => !isLevelAvailable(t.year, t.level, t.simplifyLevel))
+  const targets = allTargets.filter(t => isLevelAvailable(t.year, t.level, t.simplifyLevel))
   const missing = targets.filter(t => !create && !t.dataset?.id)
   if (missing.length) throw new Error(`Jeu de données à mettre à jour non renseigné pour : ${missing.map(targetLabel).join(', ')}`)
 
   await log.step('Configuration')
+  if (unavailable.length) await log.warning(`Ignorés, non publiés par l'IGN pour ce millésime et ce niveau de détail : ${unavailable.map(targetLabel).join(', ')}`)
+  if (!targets.length) return
   await log.info(`${create ? 'Création' : 'Mise à jour'} de ${targets.length} jeu(x) de données, millésimes ${[...new Set(targets.map(t => t.year))].join(', ')}.`)
-  if (unavailable.length) await log.warning(`Ignorés, niveau absent de la livraison IGN : ${unavailable.map(targetLabel).join(', ')}`)
 
   try {
     const existingBySlug = create && !skipUpload ? await fetchExistingDatasetsBySlug(axios, log) : new Map()
@@ -88,39 +90,29 @@ export const run: RunFunction<ProcessingConfig> = async (context) => {
         const levelTitle = LEVEL_LABELS[level]
         await log.step(`${year} — ${levelTitle}`)
 
-        const source = getSourceForLevel(year, level)
         const mergeArm = level === 'commune' && combineCommunesAndPlm
-        const armLayer = mergeArm && isLevelAvailable(year, 'arrondissement-municipal') ? getSourceForLevel(year, 'arrondissement-municipal').layer : null
-        const extracted: { extractDir: string, format: typeof source.archives[number]['format'] }[] = []
-        const chefLieuPaths: string[] = []
-
-        // Download and chef-lieu join once, whatever the number of simplifications
-        for (const archive of source.archives) {
-          const { extractDir } = await downloadArchive(archive.url, downloadDir, axios, log)
-          extracted.push({ extractDir, format: archive.format })
-          if (source.chefLieuLayer) {
-            const outputDir = path.join(tmpDir, 'geojson', 'chef-lieu', path.basename(extractDir))
-            chefLieuPaths.push(...await convertLayer({ extractDir, format: archive.format, layer: source.chefLieuLayer, outputDir, simplifyTolerance: null, optional: true, log }))
-          }
-        }
-        if (chefLieuPaths.length) await loadChefLieux(chefLieuPaths, memory)
-
         const schema = getDatasetSchema(level, { year, enableVtPrepare, combineCommunesAndPlm })
-        const metadata = getDatasetMetadata(level, year, source, { combineCommunesAndPlm })
 
         for (const target of levelTargets) {
           const { simplifyLevel } = target
-          const simplifyTolerance = SIMPLIFY_TOLERANCES[simplifyLevel]
+          const source = getSourceForLevel(year, level, simplifyLevel)
+          const armLayer = mergeArm && isLevelAvailable(year, 'arrondissement-municipal', simplifyLevel) ? getSourceForLevel(year, 'arrondissement-municipal', simplifyLevel).layer : null
+          const chefLieuPaths: string[] = []
           const paths: string[] = []
           const armPaths: string[] = []
-          for (const { extractDir, format } of extracted) {
-            const outputDir = path.join(tmpDir, 'geojson', simplifyLevel, path.basename(extractDir))
+          // an archive is downloaded once per run, whatever the number of levels read from it
+          for (const archive of source.archives) {
+            const { extractDir } = await downloadArchive(archive.url, downloadDir, axios, log)
+            const outputDir = path.join(tmpDir, 'geojson', path.basename(extractDir))
             const convert = (layer: string, optional = false) =>
-              convertLayer({ extractDir, format, layer, outputDir, simplifyTolerance, optional, log })
+              convertLayer({ extractDir, format: archive.format, layer, outputDir, optional, log })
+            if (source.chefLieuLayer) chefLieuPaths.push(...await convert(source.chefLieuLayer, true))
             paths.push(...await convert(source.layer))
             if (armLayer) armPaths.push(...await convert(armLayer, true))
           }
-          if (mergeArm && armPaths.length === 0) await log.warning(`Arrondissements municipaux introuvables pour ${year}, les communes de Paris, Lyon et Marseille sont conservées telles quelles.`)
+          if (chefLieuPaths.length) await loadChefLieux(chefLieuPaths, memory)
+          if (mergeArm && armPaths.length === 0) await log.warning(`Arrondissements municipaux introuvables pour ${targetLabel(target)}, les communes de Paris, Lyon et Marseille sont conservées telles quelles.`)
+          const metadata = getDatasetMetadata(level, year, source, { combineCommunesAndPlm })
 
           const slug = `${datasetIdPrefix}-${year}-${level}-${simplifyLevel}`
           const normalizedPath = path.join(tmpDir, 'normalized', `${slug}.geojson`)

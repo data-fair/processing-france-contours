@@ -45,20 +45,20 @@
     },
     "simplifyLevel": {
       "type": "string",
-      "title": "Simplification",
-      "default": "medium",
+      "title": "Niveau de détail",
+      "default": "carto",
       "oneOf": [
         {
           "const": "full",
-          "title": "Aucune (tracés d'origine)"
+          "title": "Complet : ADMIN-EXPRESS-COG, seul disponible pour les IRIS"
         },
         {
-          "const": "medium",
-          "title": "Moyenne (~100 m)"
+          "const": "carto",
+          "title": "Cartographique : ADMIN-EXPRESS-COG-CARTO (à partir de 2021)"
         },
         {
-          "const": "simple",
-          "title": "Forte (~1 km)"
+          "const": "carto-pe",
+          "title": "Petites échelles : ADMIN-EXPRESS-COG-CARTO-PE (à partir de 2024)"
         }
       ]
     },
@@ -122,18 +122,18 @@
               "type": "string",
               "title": "Préfixe des slugs",
               "default": "france-contours",
-              "description": "Chaque jeu est créé avec le slug `<préfixe>-<millésime>-<niveau>-<simplification>` (ex : `france-contours-2026-commune-medium`). Si un jeu de données du compte porte déjà ce slug, il est réutilisé plutôt que dupliqué. Les jeux ne sont créés qu'une fois : la configuration bascule ensuite en mise à jour."
+              "description": "Chaque jeu est créé avec le slug `<préfixe>-<millésime>-<niveau>-<détail>` (ex : `france-contours-2026-commune-carto`). Si un jeu de données du compte porte déjà ce slug, il est réutilisé plutôt que dupliqué. Les jeux ne sont créés qu'une fois : la configuration bascule ensuite en mise à jour."
             },
             "createAll": {
               "type": "boolean",
-              "title": "Tous les niveaux dans toutes les simplifications",
+              "title": "Tous les niveaux dans tous les niveaux de détail",
               "default": false,
-              "description": "Pour un lancement initial : produit toutes les combinaisons niveau × simplification pour chaque millésime choisi. Les cantons et les arrondissements municipaux n'existent qu'à partir de 2020."
+              "description": "Pour un lancement initial : produit toutes les combinaisons niveau × niveau de détail publiées par l'IGN pour chaque millésime choisi."
             },
             "datasets": {
               "type": "array",
               "title": "Jeux de données à créer",
-              "description": "Une ligne par niveau et simplification, déclinée pour chaque millésime choisi. Un même niveau peut figurer plusieurs fois avec des simplifications différentes.",
+              "description": "Une ligne par niveau et niveau de détail, déclinée pour chaque millésime choisi. Un même niveau peut figurer plusieurs fois avec des niveaux de détail différents. Une combinaison que l'IGN ne publie pas pour un millésime est ignorée avec un avertissement.",
               "layout": {
                 "if": "!parent.data.createAll",
                 "listEditMode": "inline",
@@ -144,19 +144,19 @@
               "default": [
                 {
                   "level": "region",
-                  "simplifyLevel": "medium"
+                  "simplifyLevel": "carto"
                 },
                 {
                   "level": "departement",
-                  "simplifyLevel": "medium"
+                  "simplifyLevel": "carto"
                 },
                 {
                   "level": "epci",
-                  "simplifyLevel": "medium"
+                  "simplifyLevel": "carto"
                 },
                 {
                   "level": "commune",
-                  "simplifyLevel": "medium"
+                  "simplifyLevel": "carto"
                 }
               ],
               "items": {

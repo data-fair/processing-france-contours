@@ -9,7 +9,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import * as plugin from '../index.ts'
 import processingConfigSchema from '../processing-config-schema.json' with { type: 'json' }
-import { ADMIN_EXPRESS_ARCHIVES, IRIS_ARCHIVES, SIMPLIFY_TOLERANCES, YEARS, getSourceForLevel, isLevelAvailable } from '../lib/sources.ts'
+import { ADMIN_EXPRESS_ARCHIVES, IRIS_ARCHIVES, SIMPLIFY_LEVELS, YEARS, getSourceForLevel, isLevelAvailable } from '../lib/sources.ts'
 import { getDatasetSchema } from '../lib/schemas.ts'
 import { getDatasetMetadata } from '../lib/metadata.ts'
 import { createTerritoryMemory, departementalCode, formatInseeCode, loadChefLieux, normalizeFeature, normalizeGeojson, parseGeojsonFeatures } from '../lib/normalize.ts'
@@ -72,28 +72,34 @@ describe('Processing France Contours', () => {
     it('labels the technical enum values', () => {
       const defs = processingConfigSchema.$defs
       assert.deepEqual(defs.level.oneOf.map(i => i.const), LEVEL_ORDER)
-      assert.deepEqual(defs.simplifyLevel.oneOf.map(i => i.const), Object.keys(SIMPLIFY_TOLERANCES))
+      assert.deepEqual(defs.simplifyLevel.oneOf.map(i => i.const), SIMPLIFY_LEVELS)
     })
 
     it('offers exactly the years that have a source', () => {
       assert.deepEqual(processingConfigSchema.$defs.year.enum, YEARS)
-      assert.deepEqual(Object.keys(IRIS_ARCHIVES).map(Number).sort(), Object.keys(ADMIN_EXPRESS_ARCHIVES).map(Number).sort())
+      assert.deepEqual(Object.keys(IRIS_ARCHIVES).map(Number).sort(), Object.keys(ADMIN_EXPRESS_ARCHIVES.full).map(Number).sort())
     })
 
     it('crosses the millésimes with the rows, most recent first and from region down, without duplicates', () => {
-      assert.equal(getTargets({ datasetMode: 'create', createAll: true, years: [2026, 2025] } as any).length, 2 * 8 * 3)
       const rows = [
-        { level: 'iris', simplifyLevel: 'simple' },
+        { level: 'iris', simplifyLevel: 'full' },
         { level: 'commune', simplifyLevel: 'full' },
-        { level: 'region', simplifyLevel: 'medium' },
+        { level: 'region', simplifyLevel: 'carto' },
         { level: 'commune', simplifyLevel: 'full' }
       ]
       assert.deepEqual(getTargets({ datasetMode: 'create', years: [2019, 2026], datasets: rows } as any).map(t => `${t.year}-${t.level}-${t.simplifyLevel}`), [
-        '2026-region-medium', '2026-commune-full', '2026-iris-simple',
-        '2019-region-medium', '2019-commune-full', '2019-iris-simple'
+        '2026-region-carto', '2026-commune-full', '2026-iris-full',
+        '2019-region-carto', '2019-commune-full', '2019-iris-full'
       ])
-      const updateRows = [{ year: 2024, level: 'canton', simplifyLevel: 'medium', dataset: { id: 'a' } }, { year: 2025, level: 'region', simplifyLevel: 'medium', dataset: { id: 'b' } }]
+      const updateRows = [{ year: 2024, level: 'canton', simplifyLevel: 'carto', dataset: { id: 'a' } }, { year: 2025, level: 'region', simplifyLevel: 'carto', dataset: { id: 'b' } }]
       assert.deepEqual(getTargets({ datasetMode: 'update', datasets: updateRows } as any).map(t => t.dataset?.id), ['b', 'a'])
+    })
+
+    it('creates all only what the IGN publishes', () => {
+      const all = getTargets({ datasetMode: 'create', createAll: true, years: [2026, 2019] } as any)
+      // 2026: 7 ADMIN-EXPRESS levels in 3 details + IRIS in full; 2019: no canton nor ARM, no CARTO
+      assert.equal(all.length, 7 * 3 + 1 + 6)
+      assert.ok(all.every(t => isLevelAvailable(t.year, t.level, t.simplifyLevel)))
     })
   })
 
@@ -105,7 +111,7 @@ describe('Processing France Contours', () => {
       const server = http.createServer((req, res) => {
         req.setEncoding('latin1')
         req.on('data', chunk => { if (body.length < 100000) body += chunk })
-        req.on('end', () => { res.writeHead(201, { 'content-type': 'application/json' }); res.end(JSON.stringify({ id: 'abc', slug: 'france-contours-2026-region-medium', title: 'T' })) })
+        req.on('end', () => { res.writeHead(201, { 'content-type': 'application/json' }); res.end(JSON.stringify({ id: 'abc', slug: 'france-contours-2026-region-carto', title: 'T' })) })
       })
       await new Promise<void>(resolve => server.listen(0, resolve))
       const progress: [string, number, number][] = []
@@ -114,7 +120,7 @@ describe('Processing France Contours', () => {
       try {
         const axiosInstance = axiosLib.create({ baseURL: `http://localhost:${(server.address() as any).port}/` })
         const schema = getDatasetSchema('region', { year: 2026 })
-        const res = await uploadDataset({ slug: 'france-contours-2026-region-medium', title: 'T', filePath, schema, metadata: {} as any, count: 0 }, undefined, axiosInstance, uploadLog)
+        const res = await uploadDataset({ slug: 'france-contours-2026-region-carto', title: 'T', filePath, schema, metadata: {} as any, count: 0 }, undefined, axiosInstance, uploadLog)
         assert.equal(res.id, 'abc')
         assert.ok(body.includes('"key":"insee_reg"'), 'schema keys are lowercased')
         assert.deepEqual(tasks, ['Téléversement de « T »'])
@@ -159,10 +165,27 @@ describe('Processing France Contours', () => {
       assert.equal(getSourceForLevel(2020, 'arrondissement').layer, 'ARRONDISSEMENT_DEPARTEMENTAL')
       assert.equal(getSourceForLevel(2021, 'arrondissement').layer, 'ARRONDISSEMENT')
       assert.equal(getSourceForLevel(2020, 'canton').layer, 'CANTON')
-      assert.equal(isLevelAvailable(2019, 'canton'), false)
-      assert.equal(isLevelAvailable(2019, 'arrondissement-municipal'), false)
-      assert.equal(isLevelAvailable(2019, 'commune'), true)
-      assert.throws(() => getSourceForLevel(2019, 'canton'), /No canton layer/)
+      assert.equal(isLevelAvailable(2019, 'canton', 'full'), false)
+      assert.equal(isLevelAvailable(2019, 'arrondissement-municipal', 'full'), false)
+      assert.equal(isLevelAvailable(2019, 'commune', 'full'), true)
+      assert.throws(() => getSourceForLevel(2019, 'canton'), /No canton source/)
+    })
+
+    it('reads the generalized IGN editions instead of simplifying, and skips what they do not cover', () => {
+      assert.equal(getSourceForLevel(2021, 'commune', 'carto').archives[0].url, 'https://data.geopf.fr/telechargement/download/ADMIN-EXPRESS-COG-CARTO/ADMIN-EXPRESS-COG-CARTO_3-0__SHP_WGS84G_FRA_2021-05-19/ADMIN-EXPRESS-COG-CARTO_3-0__SHP_WGS84G_FRA_2021-05-19.7z')
+      const pe2026 = getSourceForLevel(2026, 'region', 'carto-pe')
+      assert.ok(pe2026.archives[0].url.includes('/ADMIN-EXPRESS-COG-CARTO-PE/ADMIN-EXPRESS-COG-CARTO-PE_4-0__GPKG_WGS84G_FRA_2026-01-01/'))
+      assert.equal(pe2026.chefLieuLayer, 'chef_lieu_de_region')
+      const pe2024 = getSourceForLevel(2024, 'commune', 'carto-pe')
+      assert.equal(pe2024.archives.length, 6, 'one archive per territory')
+      assert.ok(pe2024.archives.every(a => a.format === 'shp'))
+      assert.equal(isLevelAvailable(2020, 'commune', 'carto'), false)
+      assert.equal(isLevelAvailable(2023, 'commune', 'carto-pe'), false)
+      assert.equal(isLevelAvailable(2024, 'arrondissement-municipal', 'carto-pe'), false)
+      assert.equal(isLevelAvailable(2025, 'arrondissement-municipal', 'carto-pe'), true)
+      assert.equal(isLevelAvailable(2026, 'iris', 'carto'), false)
+      assert.equal(isLevelAvailable(2026, 'iris', 'full'), true)
+      assert.throws(() => getSourceForLevel(2020, 'commune', 'carto'), /2020/)
     })
 
     it('serves ADMIN-EXPRESS-COG from the Géoplateforme, GeoPackage from 2025', () => {
@@ -243,8 +266,8 @@ describe('Processing France Contours', () => {
 
     it('follows the data-fair guidelines for summaries and descriptions', () => {
       for (const level of levels) {
-        for (const year of [2017, 2026].filter(y => isLevelAvailable(y, level))) {
-          const meta = getDatasetMetadata(level, year, getSourceForLevel(year, level), { combineCommunesAndPlm: true })
+        for (const [year, detail] of SIMPLIFY_LEVELS.flatMap(d => [2017, 2026].map(y => [y, d] as const)).filter(([y, d]) => isLevelAvailable(y, level, d))) {
+          const meta = getDatasetMetadata(level, year, getSourceForLevel(year, level, detail), { combineCommunesAndPlm: true })
           assert.ok(meta.summary.length >= 150 && meta.summary.length <= 300, `${level} ${year} summary length ${meta.summary.length}`)
           assert.ok(!/^ce jeu de données/i.test(meta.summary))
           assert.ok(!meta.summary.includes('\n'))
@@ -260,6 +283,7 @@ describe('Processing France Contours', () => {
     it('records the versioned IGN product the dataset conforms to', () => {
       assert.deepEqual(getDatasetMetadata('commune', 2026, getSourceForLevel(2026, 'commune'), { combineCommunesAndPlm: true }).conformsTo, { title: 'ADMIN-EXPRESS-COG', version: '4.0', url: 'https://geoservices.ign.fr/adminexpress' })
       assert.equal(getDatasetMetadata('commune', 2017, getSourceForLevel(2017, 'commune'), { combineCommunesAndPlm: true }).conformsTo.version, '1.0')
+      assert.deepEqual(getDatasetMetadata('commune', 2024, getSourceForLevel(2024, 'commune', 'carto-pe'), { combineCommunesAndPlm: true }).conformsTo, { title: 'ADMIN-EXPRESS-COG-CARTO-PE', version: '3.1', url: 'https://geoservices.ign.fr/adminexpress' })
       const iris = getDatasetMetadata('iris', 2022, getSourceForLevel(2022, 'iris'), { combineCommunesAndPlm: true })
       assert.deepEqual(iris.conformsTo, { title: 'CONTOURS-IRIS', version: '2.1', url: 'https://geoservices.ign.fr/contoursiris' })
       assert.equal(iris.creator, 'IGN et INSEE')
@@ -466,30 +490,25 @@ describe('Processing France Contours', () => {
   })
 
   describe('GDAL conversion', { skip: !hasOgr2ogr && 'no ogr2ogr binary' }, () => {
-    it('simplifies after reprojection, so the tolerance in degrees also applies to Lambert-93 sources', async () => {
+    it('reprojects a Lambert-93 source to WGS84 without touching its vertices', async () => {
       const extractDir = path.join(tmpDir, 'delivery-shp', 'ADE_1-0_SHP_LAMB93_FR')
       await fs.ensureDir(extractDir)
       const source = path.join(tmpDir, 'circle.geojson')
       await fs.writeJson(source, lambertCircle())
       await promisify(execFile)('ogr2ogr', ['-f', 'ESRI Shapefile', '-a_srs', 'EPSG:2154', path.join(extractDir, 'REGION.shp'), source])
 
-      const converted = await convertLayer({ extractDir: path.dirname(extractDir), format: 'shp', layer: 'region', outputDir: path.join(tmpDir, 'geojson-simplified'), simplifyTolerance: 0.001, log })
+      const converted = await convertLayer({ extractDir: path.dirname(extractDir), format: 'shp', layer: 'region', outputDir: path.join(tmpDir, 'geojson'), log })
       assert.equal(converted.length, 1)
       assert.equal(path.basename(converted[0]), 'region.geojson')
-      const simplified = await fs.readJson(converted[0])
-      const ring = simplified.features[0].geometry.coordinates[0]
-      assert.ok(ring.length < 20, `expected a handful of vertices after simplification, got ${ring.length}`)
+      const ring = (await fs.readJson(converted[0])).features[0].geometry.coordinates[0]
+      assert.equal(ring.length, 401)
       assert.ok(ring.every(([lon, lat]: number[]) => lon > 2 && lon < 3 && lat > 48 && lat < 49), 'coordinates are WGS84 lon/lat')
-
-      const full = await convertLayer({ extractDir: path.dirname(extractDir), format: 'shp', layer: 'region', outputDir: path.join(tmpDir, 'geojson-full'), simplifyTolerance: null, log })
-      assert.equal((await fs.readJson(full[0])).features[0].geometry.coordinates[0].length, 401)
-      assert.ok(!await fs.pathExists(`${converted[0]}.4326.gpkg`), 'the intermediate GeoPackage is removed')
     })
 
     it('tolerates a missing optional layer and fails on a missing mandatory one', async () => {
       const extractDir = path.join(tmpDir, 'delivery-shp')
-      assert.deepEqual(await convertLayer({ extractDir, format: 'shp', layer: 'ARRONDISSEMENT_MUNICIPAL', outputDir: path.join(tmpDir, 'geojson-arm'), simplifyTolerance: null, optional: true, log }), [])
-      await assert.rejects(convertLayer({ extractDir, format: 'shp', layer: 'COMMUNE', outputDir: path.join(tmpDir, 'geojson-com'), simplifyTolerance: null, log }), /COMMUNE introuvable/)
+      assert.deepEqual(await convertLayer({ extractDir, format: 'shp', layer: 'ARRONDISSEMENT_MUNICIPAL', outputDir: path.join(tmpDir, 'geojson-arm'), optional: true, log }), [])
+      await assert.rejects(convertLayer({ extractDir, format: 'shp', layer: 'COMMUNE', outputDir: path.join(tmpDir, 'geojson-com'), log }), /COMMUNE introuvable/)
     })
   })
 
@@ -497,7 +516,7 @@ describe('Processing France Contours', () => {
     beforeEach(() => { resetStopState() })
 
     it('prepare returns the config untouched (no secret)', async () => {
-      const config = { datasetMode: 'create', years: [2026], datasets: [{ level: 'commune', simplifyLevel: 'medium' }] } as any
+      const config = { datasetMode: 'create', years: [2026], datasets: [{ level: 'commune', simplifyLevel: 'carto' }] } as any
       const res = await plugin.prepare({ processingConfig: config, secrets: {} })
       assert.deepEqual(res.processingConfig, config)
     })

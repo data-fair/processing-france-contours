@@ -22,9 +22,12 @@ export interface DatasetMetadata {
 // "lov2" entry of data-fair's standard licenses; the IGN open data are distributed under it
 const LICENCE_OUVERTE = { title: 'Licence Ouverte / Open Licence version 2.0', href: 'https://www.etalab.gouv.fr/licence-ouverte-open-licence' }
 
-const PRODUCTS = {
-  adminExpress: { title: 'ADMIN-EXPRESS-COG', url: 'https://geoservices.ign.fr/adminexpress', creator: 'IGN' },
-  iris: { title: 'CONTOURS-IRIS', url: 'https://geoservices.ign.fr/contoursiris', creator: 'IGN et INSEE' }
+const ADMIN_EXPRESS_URL = 'https://geoservices.ign.fr/adminexpress'
+const PRODUCTS: Record<string, { url: string, creator: string, geometry: string }> = {
+  'ADMIN-EXPRESS-COG': { url: ADMIN_EXPRESS_URL, creator: 'IGN', geometry: 'Les géométries sont celles de la version non généralisée de la base, reprojetées en WGS84 (EPSG:4326) : adaptées à l\'analyse et aux grandes échelles, mais volumineuses.' },
+  'ADMIN-EXPRESS-COG-CARTO': { url: ADMIN_EXPRESS_URL, creator: 'IGN', geometry: 'Les géométries sont généralisées par l\'IGN pour la cartographie, en conservant les limites communes entre territoires voisins, puis reprojetées en WGS84 (EPSG:4326).' },
+  'ADMIN-EXPRESS-COG-CARTO-PE': { url: ADMIN_EXPRESS_URL, creator: 'IGN', geometry: 'Les géométries sont fortement généralisées par l\'IGN pour la cartographie à petite échelle (France entière), en conservant les limites communes entre territoires voisins, puis reprojetées en WGS84 (EPSG:4326).' },
+  'CONTOURS-IRIS': { url: 'https://geoservices.ign.fr/contoursiris', creator: 'IGN et INSEE', geometry: 'Les géométries sont celles de la base, reprojetées en WGS84 (EPSG:4326).' }
 }
 
 const SUBJECTS: Record<AdministrativeLevel, { summary: string, content: string, keywords: string[] }> = {
@@ -70,11 +73,15 @@ const SUBJECTS: Record<AdministrativeLevel, { summary: string, content: string, 
   }
 }
 
+/** ".../download/ADMIN-EXPRESS-COG-CARTO/..." → "ADMIN-EXPRESS-COG-CARTO" */
+const productTitle = (archiveUrl: string): string => archiveUrl.match(/\/download\/([^/]+)\//)![1]
+
 /** "ADMIN-EXPRESS-COG_4-0__GPKG_WGS84G_FRA_2026-01-01" → "4.0" */
 const productVersion = (archiveUrl: string): string => archiveUrl.match(/_(\d+)-(\d+)__/)?.slice(1, 3).join('.') ?? ''
 
 export const getDatasetMetadata = (level: AdministrativeLevel, year: number, source: LevelSource, options: { combineCommunesAndPlm: boolean }): DatasetMetadata => {
-  const product = level === 'iris' ? PRODUCTS.iris : PRODUCTS.adminExpress
+  const title = productTitle(source.archives[0].url)
+  const product = { title, ...PRODUCTS[title] }
   const subject = SUBJECTS[level]
   const plm = level === 'commune' && options.combineCommunesAndPlm
   const version = productVersion(source.archives[0].url)
@@ -88,7 +95,7 @@ export const getDatasetMetadata = (level: AdministrativeLevel, year: number, sou
     '',
     '## Contenu',
     '',
-    '- Les géométries sont reprojetées en WGS84 (EPSG:4326) et peuvent être simplifiées selon le niveau de détail du jeu de données, indiqué dans son titre.',
+    `- ${product.geometry}`,
     '- Tous les codes (INSEE, SIREN) sont des chaînes de caractères : les zéros initiaux et les codes corses `2A`/`2B` sont préservés.',
     ...(level === 'commune' || level === 'arrondissement-municipal' || level === 'iris'
       ? ['- Les libellés de région, de département et d\'EPCI sont repris de l\'édition la plus récente traitée, afin d\'être homogènes d\'un millésime à l\'autre.']

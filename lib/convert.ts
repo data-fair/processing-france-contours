@@ -14,8 +14,6 @@ export interface ConvertOptions {
   /** GeoPackage layer name or Shapefile basename, matched case-insensitively */
   layer: string
   outputDir: string
-  /** Tolerance in degrees, applied after reprojection; null keeps the source geometries */
-  simplifyTolerance: number | null
   /** Return an empty list instead of failing when the layer is absent (ARM in overseas deliveries, chef-lieu layers) */
   optional?: boolean
   log: Log
@@ -36,30 +34,11 @@ export const listGpkgLayers = async (gpkgPath: string): Promise<string[]> => {
   return [...stdout.matchAll(/^\d+:\s+([\w-]+)/gm)].map(m => m[1])
 }
 
-/**
- * Converts one layer to a WGS84 RFC 7946 GeoJSON file.
- *
- * ogr2ogr applies -simplify in the units of the *source* SRS, before -t_srs: on the Lambert-93
- * deliveries (ADMIN-EXPRESS 2017-2018, CONTOURS-IRIS up to 2025) a tolerance expressed in degrees
- * would be interpreted as a fraction of a meter and simplify nothing. The reprojection is therefore
- * done first, into a temporary GeoPackage, and the simplification in a second pass.
- */
-export const ogr2geojson = async (inputPath: string, layer: string | undefined, outputPath: string, simplifyTolerance: number | null): Promise<void> => {
+/** Converts one layer to a WGS84 RFC 7946 GeoJSON file */
+export const ogr2geojson = async (inputPath: string, layer: string | undefined, outputPath: string): Promise<void> => {
   const tmpOutput = `${outputPath}.tmp`
-  const layerArgs = layer ? [layer] : []
   try {
-    if (simplifyTolerance) {
-      const reprojected = `${outputPath}.4326.gpkg`
-      await fs.remove(reprojected)
-      await runCommand('ogr2ogr', ['-f', 'GPKG', '-t_srs', 'EPSG:4326', reprojected, inputPath, ...layerArgs])
-      try {
-        await runCommand('ogr2ogr', ['-f', 'GeoJSON', '-lco', 'RFC7946=YES', '-simplify', String(simplifyTolerance), tmpOutput, reprojected])
-      } finally {
-        await fs.remove(reprojected)
-      }
-    } else {
-      await runCommand('ogr2ogr', ['-f', 'GeoJSON', '-t_srs', 'EPSG:4326', '-lco', 'RFC7946=YES', tmpOutput, inputPath, ...layerArgs])
-    }
+    await runCommand('ogr2ogr', ['-f', 'GeoJSON', '-t_srs', 'EPSG:4326', '-lco', 'RFC7946=YES', tmpOutput, inputPath, ...(layer ? [layer] : [])])
     await fs.move(tmpOutput, outputPath, { overwrite: true })
   } catch (err) {
     await fs.remove(tmpOutput).catch(() => {})
@@ -72,7 +51,7 @@ export const ogr2geojson = async (inputPath: string, layer: string | undefined, 
  * territory in the older deliveries) and converts each occurrence to GeoJSON.
  */
 export const convertLayer = async (options: ConvertOptions): Promise<string[]> => {
-  const { extractDir, format, layer, outputDir, simplifyTolerance, optional, log } = options
+  const { extractDir, format, layer, outputDir, optional, log } = options
   const wanted = layer.toLowerCase()
   await fs.ensureDir(outputDir)
 
@@ -102,12 +81,12 @@ export const convertLayer = async (options: ConvertOptions): Promise<string[]> =
   const outputPaths = jobs.map(job => path.join(outputDir, job.output))
   const todo = jobs.filter((_job, i) => !fs.pathExistsSync(outputPaths[i]))
   if (todo.length) {
-    // task names must be unique in the run: the archive and the tolerance tell the conversions apart
-    const task = `Conversion de la couche ${layer} de ${path.basename(extractDir)} (${simplifyTolerance === null ? 'sans simplification' : `tolérance ${simplifyTolerance}°`})`
+    // task names must be unique in the run: the archive tells the conversions apart
+    const task = `Conversion de la couche ${layer} de ${path.basename(extractDir)}`
     await log.task(task)
     for (const [i, job] of todo.entries()) {
       assertNotStopped()
-      await ogr2geojson(job.input, job.layer, path.join(outputDir, job.output), simplifyTolerance)
+      await ogr2geojson(job.input, job.layer, path.join(outputDir, job.output))
       await log.progress(task, i + 1, todo.length)
     }
   }
