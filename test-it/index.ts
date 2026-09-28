@@ -132,6 +132,34 @@ describe('Processing France Contours', () => {
       }
     })
 
+    it('keeps the extension columns of an updated dataset in the uploaded schema', async () => {
+      const filePath = path.join(tmpDir, 'update.geojson')
+      await fs.writeFile(filePath, JSON.stringify({ type: 'FeatureCollection', features: [] }))
+      const calculated = { key: 'code_triris', type: 'string', 'x-extension': 'code_triris', 'x-refersTo': 'http://rdf.insee.fr/def/geo#GrandQuartier' }
+      let body = ''
+      const server = http.createServer((req, res) => {
+        res.writeHead(200, { 'content-type': 'application/json' })
+        if (req.method === 'GET') {
+          res.end(JSON.stringify({ id: 'abc', schema: [{ key: 'code_iris', type: 'string' }, calculated] }))
+          return
+        }
+        req.setEncoding('latin1')
+        req.on('data', chunk => { body += chunk })
+        req.on('end', () => { res.end(JSON.stringify({ id: 'abc', slug: 'france-contours-2026-iris-full', title: 'T' })) })
+      })
+      await new Promise<void>(resolve => server.listen(0, resolve))
+      try {
+        const axiosInstance = axiosLib.create({ baseURL: `http://localhost:${(server.address() as any).port}/` })
+        const schema = getDatasetSchema('iris', { year: 2026 })
+        await uploadDataset({ slug: 'france-contours-2026-iris-full', title: 'T', filePath, schema, metadata: {} as any, count: 0 }, { id: 'abc', slug: 'france-contours-2026-iris-full', title: 'T' }, axiosInstance, log)
+        const uploaded = JSON.parse(body.match(/name="schema"\r\n\r\n(.*)\r\n/)![1])
+        assert.deepEqual(uploaded.at(-1), calculated, 'data-fair checks the extensions against the uploaded schema')
+        assert.equal(uploaded.filter((p: any) => p.key === 'code_iris').length, 1, 'file columns are not duplicated')
+      } finally {
+        server.close()
+      }
+    })
+
     it('resumes an interrupted transfer with a range request', async () => {
       const body = Buffer.alloc(200000, 'x')
       const ranges: (string | undefined)[] = []
@@ -281,13 +309,13 @@ describe('Processing France Contours', () => {
     })
 
     it('records the versioned IGN product the dataset conforms to', () => {
-      assert.deepEqual(getDatasetMetadata('commune', 2026, getSourceForLevel(2026, 'commune'), { combineCommunesAndPlm: true }).conformsTo, { title: 'ADMIN-EXPRESS-COG', version: '4.0', url: 'https://geoservices.ign.fr/adminexpress' })
+      assert.deepEqual(getDatasetMetadata('commune', 2026, getSourceForLevel(2026, 'commune'), { combineCommunesAndPlm: true }).conformsTo, { title: 'ADMIN-EXPRESS-COG', version: '4.0', url: 'https://www.data.gouv.fr/datasets/admin-express-admin-express-cog-admin-express-cog-carto-admin-express-cog-carto-pe-admin-express-cog-carto-plus-pe' })
       assert.equal(getDatasetMetadata('commune', 2017, getSourceForLevel(2017, 'commune'), { combineCommunesAndPlm: true }).conformsTo.version, '1.0')
-      assert.deepEqual(getDatasetMetadata('commune', 2024, getSourceForLevel(2024, 'commune', 'carto-pe'), { combineCommunesAndPlm: true }).conformsTo, { title: 'ADMIN-EXPRESS-COG-CARTO-PE', version: '3.1', url: 'https://geoservices.ign.fr/adminexpress' })
+      assert.deepEqual(getDatasetMetadata('commune', 2024, getSourceForLevel(2024, 'commune', 'carto-pe'), { combineCommunesAndPlm: true }).conformsTo, { title: 'ADMIN-EXPRESS-COG-CARTO-PE', version: '3.1', url: 'https://www.data.gouv.fr/datasets/admin-express-admin-express-cog-admin-express-cog-carto-admin-express-cog-carto-pe-admin-express-cog-carto-plus-pe' })
       const iris = getDatasetMetadata('iris', 2022, getSourceForLevel(2022, 'iris'), { combineCommunesAndPlm: true })
-      assert.deepEqual(iris.conformsTo, { title: 'CONTOURS-IRIS', version: '2.1', url: 'https://geoservices.ign.fr/contoursiris' })
+      assert.deepEqual(iris.conformsTo, { title: 'CONTOURS-IRIS', version: '2.1', url: 'https://www.data.gouv.fr/datasets/contours-iris-r-2' })
       assert.equal(iris.creator, 'IGN et INSEE')
-      assert.equal(iris.origin, 'https://geoservices.ign.fr/contoursiris')
+      assert.equal(iris.origin, 'https://www.data.gouv.fr/datasets/contours-iris-r-2')
     })
 
     it('uses each concept at most once per dataset and labels the coded columns', () => {

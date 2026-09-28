@@ -77,6 +77,13 @@ export const uploadDataset = async (
   assertNotStopped()
   const actionLabel = existing ? 'Mise à jour' : 'Création'
   const stats = await fs.stat(filePath)
+  // data-fair validates the dataset extensions against the uploaded schema: a calculated column
+  // added by hand (and the enrichments that use its concept as input) must be sent back with it
+  let uploadedSchema = toDataFairSchema(schema)
+  if (existing) {
+    const current = (await axios.get(`api/v1/datasets/${existing.id}`)).data
+    uploadedSchema = uploadedSchema.concat((current.schema ?? []).filter((p: any) => p['x-extension']))
+  }
   const task = `Téléversement de « ${title} »`
   await log.task(task)
 
@@ -84,7 +91,7 @@ export const uploadDataset = async (
     assertNotStopped()
     try {
       const formData = new FormData()
-      formData.append('schema', JSON.stringify(toDataFairSchema(schema)))
+      formData.append('schema', JSON.stringify(uploadedSchema))
       formData.append('title', title)
       if (!existing) formData.append('slug', slug)
       // multipart parts are strings, data-fair parses the object/array fields as JSON

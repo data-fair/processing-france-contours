@@ -22,12 +22,13 @@ export interface DatasetMetadata {
 // "lov2" entry of data-fair's standard licenses; the IGN open data are distributed under it
 const LICENCE_OUVERTE = { title: 'Licence Ouverte / Open Licence version 2.0', href: 'https://www.etalab.gouv.fr/licence-ouverte-open-licence' }
 
-const ADMIN_EXPRESS_URL = 'https://geoservices.ign.fr/adminexpress'
+// the IGN pages on data.gouv.fr: the geoservices.ign.fr links redirect to cartes.gouv.fr pages that may render empty
+const ADMIN_EXPRESS_URL = 'https://www.data.gouv.fr/datasets/admin-express-admin-express-cog-admin-express-cog-carto-admin-express-cog-carto-pe-admin-express-cog-carto-plus-pe'
 const PRODUCTS: Record<string, { url: string, creator: string, geometry: string }> = {
   'ADMIN-EXPRESS-COG': { url: ADMIN_EXPRESS_URL, creator: 'IGN', geometry: 'Les géométries sont celles de la version non généralisée de la base, reprojetées en WGS84 (EPSG:4326) : adaptées à l\'analyse et aux grandes échelles, mais volumineuses.' },
   'ADMIN-EXPRESS-COG-CARTO': { url: ADMIN_EXPRESS_URL, creator: 'IGN', geometry: 'Les géométries sont généralisées par l\'IGN pour la cartographie, en conservant les limites communes entre territoires voisins, puis reprojetées en WGS84 (EPSG:4326).' },
   'ADMIN-EXPRESS-COG-CARTO-PE': { url: ADMIN_EXPRESS_URL, creator: 'IGN', geometry: 'Les géométries sont fortement généralisées par l\'IGN pour la cartographie à petite échelle (France entière), en conservant les limites communes entre territoires voisins, puis reprojetées en WGS84 (EPSG:4326).' },
-  'CONTOURS-IRIS': { url: 'https://geoservices.ign.fr/contoursiris', creator: 'IGN et INSEE', geometry: 'Les géométries sont celles de la base, reprojetées en WGS84 (EPSG:4326).' }
+  'CONTOURS-IRIS': { url: 'https://www.data.gouv.fr/datasets/contours-iris-r-2', creator: 'IGN et INSEE', geometry: 'Les géométries sont celles de la base, reprojetées en WGS84 (EPSG:4326).' }
 }
 
 const SUBJECTS: Record<AdministrativeLevel, { summary: string, content: string, keywords: string[] }> = {
